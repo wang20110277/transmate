@@ -32,6 +32,7 @@ class ModelPool:
                 model_provider=self.provider,
                 base_url=self.api_url,
                 api_key=self.api_key,
+                temperature=0.1
             ))
     
     def bind_tools(self, tools, **kwargs):

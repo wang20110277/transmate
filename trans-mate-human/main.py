@@ -4,15 +4,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.llm.agents import base_agent
+from app.llm.router import agent_router
 from app.core.database import init_db
 from app.base.auth_routes import router as auth_router
 
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,7 +30,7 @@ app = FastAPI(
     title="Meta Human API",
     description="Trans-Meta-Human项目API接口文档",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # 配置CORS
@@ -44,9 +44,6 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(auth_router)
-
-# 创建智能助手代理
-base_agent = base_agent.agent
 
 
 @app.get("/")
@@ -62,7 +59,9 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             # 构建message
             message = {"messages": [{"role": "user", "content": data}]}
-            result = await base_agent.ainvoke(message)
+            # 调用agent处理消息
+            result = await agent_router.ainvoke(message)
+
             response = result["messages"][-1].content
             print(response)
             await websocket.send_text(response)

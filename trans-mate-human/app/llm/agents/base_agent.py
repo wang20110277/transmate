@@ -1,6 +1,6 @@
 from langchain.agents import create_agent
 
-from app.llm.models import ModelPool
+from app.llm.models.base_model import ModelPool
 from app.llm.tools import get_weather, web_search
 
 model = ModelPool()
