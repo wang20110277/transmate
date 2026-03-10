@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 
 from app.llm.agents.base_agent import agent as base_agent
-from app.llm.agents.stock_data_agent import stock_data_agent
+from app.llm.agents.stock_agent import stock_data_agent
 
 
 class AgentState(dict):

@@ -1,22 +1,21 @@
+"""
+Qwen 模型池
+"""
+
 import asyncio
-import os
 from typing import Dict, Any
 
-from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 
-load_dotenv()
-
-DEFAULT_MODEL = os.getenv("KIMI_MODEL", "kimi-k2-turbo-preview")
-DEFAULT_PROVIDER = os.getenv("KIMI_PROVIDER", "moonshot")
-DEFAULT_API_URL = os.getenv("KIMI_API_URL", "https://api.moonshot.cn/v1")
-DEFAULT_API_KEY = os.getenv(
-    "KIMI_API_KEY", "sk-pWTf47E87LVhUPFr1eYRtdVCnOUJRHLYY94Vkl7iTi4CP2Cs"
+from app.core.config import (
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+    DEFAULT_API_URL,
+    DEFAULT_API_KEY,
 )
-DEFAULT_TIMEOUT = int(os.getenv("KIMI_TIMEOUT", "60"))
 
 
-class StockModelPool:
+class ModelPool:
     def __init__(
         self,
         size: int = 5,
@@ -24,7 +23,6 @@ class StockModelPool:
         provider: str = None,
         api_url: str = None,
         api_key: str = None,
-        timeout: int = None,
     ):
         self.size = size
         self.models = []
@@ -35,7 +33,6 @@ class StockModelPool:
         self.provider = provider or DEFAULT_PROVIDER
         self.api_url = api_url or DEFAULT_API_URL
         self.api_key = api_key or DEFAULT_API_KEY
-        self.timeout = timeout or DEFAULT_TIMEOUT
 
     def initialize_models(self):
         for _ in range(self.size):
@@ -46,7 +43,6 @@ class StockModelPool:
                     base_url=self.api_url,
                     api_key=self.api_key,
                     temperature=0.1,
-                    timeout=self.timeout,
                 )
             )
 
@@ -63,18 +59,16 @@ class StockModelPool:
             self.initialize_models()
             return self._get_model()
 
-    def invoke(self, input_data: Dict[str, Any], timeout: int = None):
+    def invoke(self, input_data: Dict[str, Any]):
         model = self._get_model()
-        request_timeout = timeout or self.timeout
-        return model.invoke(input_data, timeout=request_timeout)
+        return model.invoke(input_data)
 
-    async def ainvoke(self, input_data: Dict[str, Any], timeout: int = None):
+    async def ainvoke(self, input_data: Dict[str, Any]):
         async with self.semaphore:
             model = self._get_model()
-            request_timeout = timeout or self.timeout
             if isinstance(input_data, dict) and "messages" in input_data:
                 messages = input_data["messages"]
-                result = await model.ainvoke(messages, timeout=request_timeout)
+                result = await model.ainvoke(messages)
             else:
-                result = await model.ainvoke(input_data, timeout=request_timeout)
+                result = await model.ainvoke(input_data)
             return result

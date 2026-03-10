@@ -1,6 +1,6 @@
-from app.llm.models.stock_model import StockModelPool
 from crewai import Agent
-from app.llm.tools.stock_api_tool_crewai import (
+from app.llm.models.kimi_model import create_crewai_llm
+from app.llm.tools import (
     get_stock_info,
     get_stock_daily,
     get_stock_realtime,
@@ -9,7 +9,7 @@ from app.llm.tools.stock_api_tool_crewai import (
     search_stock,
 )
 
-model = StockModelPool()
+model = create_crewai_llm()
 
 stock_data_agent = Agent(
     role="股票产品数据采集专家",
@@ -24,5 +24,5 @@ stock_data_agent = Agent(
         search_stock,
     ],
     llm=model,
-    verbose=True
+    verbose=True,
 )
