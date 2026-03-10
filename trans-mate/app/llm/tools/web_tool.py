@@ -10,7 +10,7 @@ from app.core.config import TAVILY_API_KEY
 
 @tool
 async def web_search(query: str) -> str:
-    """使用 Tavily API 搜索网络"""
+    """搜索网络"""
     api_key = TAVILY_API_KEY
 
     if not api_key:

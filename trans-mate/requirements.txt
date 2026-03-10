@@ -13,9 +13,6 @@ ipykernel==7.1.0
 fastapi==0.128.0
 uvicorn[standard]==0.40.0
 
-#crewai
-crewai==1.10.1
-
 #langchain
 langchain==1.2.0
 langchain_core==1.2.5

@@ -3,6 +3,7 @@ Main application entry point
 """
 
 import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -74,8 +75,6 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         logging.info("WebSocket连接已断开")
     except Exception as e:
-        import traceback
-
         logging.error(f"WebSocket连接发生异常: {e}")
         logging.error(f"完整堆栈: {traceback.format_exc()}")
     finally:
