@@ -1,37 +1,26 @@
-"""
-Web Search Tool (Tavily)
-"""
-
-import httpx
 from langchain_core.tools import tool
+from tavily import TavilyClient
 
 from app.core.config import TAVILY_API_KEY
 
 
 @tool
 async def web_search(query: str) -> str:
-    """搜索网络"""
+    """搜索网络查询功能"""
     api_key = TAVILY_API_KEY
 
     if not api_key:
         return "搜索功能未配置 API Key，请联系管理员配置 TAVILY_API_KEY"
 
-    url = "https://api.tavily.com/search"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "api_key": api_key,
-        "query": query,
-        "search_depth": "basic",
-        "max_results": 5,
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        tavily_client = TavilyClient(api_key=api_key)
+        response = tavily_client.search(
+            query=query,
+            search_depth="basic",
+            max_results=5,
+        )
 
-        results = data.get("results", [])
+        results = response.get("results", [])
         if not results:
             return f"未找到与「{query}」相关的搜索结果"
 
@@ -46,9 +35,5 @@ async def web_search(query: str) -> str:
 
         return "搜索结果：\n\n" + "\n\n".join(formatted_results)
 
-    except httpx.TimeoutException:
-        return f"搜索「{query}」超时，请稍后重试"
-    except httpx.HTTPStatusError as e:
-        return f"搜索失败：HTTP错误 {e.response.status_code}"
     except Exception as e:
         return f"搜索失败：{str(e)}"

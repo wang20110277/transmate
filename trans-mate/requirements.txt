@@ -48,3 +48,6 @@ httpx==0.28.1
 
 #tushare
 tushare==1.4.9
+
+#tavily
+tavily-python==0.7.23
