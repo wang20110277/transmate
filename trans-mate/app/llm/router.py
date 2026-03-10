@@ -2,7 +2,7 @@ from crewai import Crew, Task, Process
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 
-from app.llm.agents.base_agent import agent as base_agent
+from app.llm.agents.base_agent import base_agent
 from app.llm.agents.stock_agent import stock_data_agent
 
 
@@ -111,16 +111,9 @@ async def call_stock_agent(state: AgentState) -> AgentState:
     else:
         user_input = str(last_message)
 
-    task = create_stock_task(user_input)
-    crew = Crew(
-        agents=[stock_data_agent],
-        tasks=[task],
-        process=Process.sequential,
-        verbose=True,
-    )
-    result = crew.kickoff()
+    result = await stock_data_agent.ainvoke({"messages": [HumanMessage(content=user_input)]})
+    response_content = result["messages"][-1].content
 
-    response_content = str(result)
     new_messages = messages + [AIMessage(content=response_content)]
     return {"messages": new_messages}
 

@@ -14,7 +14,7 @@ system_prompt = """
 """
 
 # 创建智能助手代理，集成模型、工具和系统提示
-agent = create_agent(
+base_agent = create_agent(
     model=model,
     tools=[get_weather, web_search],
     system_prompt=system_prompt,

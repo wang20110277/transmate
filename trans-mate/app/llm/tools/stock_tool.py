@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 import tushare as ts
-from crewai.tools import tool
+from langchain_core.tools import tool
 
 from app.core.config import TUSHARE_TOKEN
 
