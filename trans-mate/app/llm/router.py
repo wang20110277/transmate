@@ -118,14 +118,6 @@ async def call_stock_agent(state: AgentState) -> AgentState:
     return {"messages": new_messages}
 
 
-def create_stock_task(user_input: str):
-    return Task(
-        description=user_input,
-        agent=stock_data_agent,
-        expected_output="股票相关数据和分析结果",
-    )
-
-
 def create_agent_graph():
     """创建 LangGraph 路由图"""
     workflow = StateGraph(AgentState)
