@@ -76,8 +76,6 @@ KNOWLEDGE_DIR = os.path.join(
 )
 CHROMA_STORE_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "app",
-    "llm", 
     "store",
 )
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")

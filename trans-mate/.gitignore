@@ -43,4 +43,4 @@ ENV/
 *.log
 
 # RAG Vector Store
-llm/store/
+store/
