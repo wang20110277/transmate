@@ -66,3 +66,23 @@ SESSION_TIMEOUT = os.getenv("SESSION_TIMEOUT")
 
 MAX_UPLOAD_SIZE = os.getenv("MAX_UPLOAD_SIZE")
 UPLOAD_DIR = os.getenv("UPLOAD_DIR")
+
+# RAG Configuration
+KNOWLEDGE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "app",
+    "llm",
+    "knowledge",
+)
+CHROMA_STORE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "app",
+    "llm", 
+    "store",
+)
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.5"))
+
+# RAGAS Evaluation Configuration
+RAGAS_API_KEY = os.getenv("RAGAS_API_KEY", os.getenv("OPENAI_API_KEY", ""))
