@@ -10,7 +10,6 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.llm.router import agent_router
-from app.llm.rag import rag_ingestion
 from app.core.database import init_db
 from app.core.config import ALLOWED_ORIGINS, CORS_ALLOW_CREDENTIALS
 from app.base.auth_routes import router as auth_router
@@ -25,16 +24,6 @@ async def lifespan(app: FastAPI):
     logging.info("正在初始化数据库...")
     init_db()
     logging.info("数据库初始化完成")
-
-    logging.info("正在初始化RAG索引...")
-    try:
-        rag_ingestion.build_index(force_rebuild=True)
-        logging.info("RAG索引初始化完成")
-    except Exception as e:
-        logging.error(f"RAG索引初始化失败: {e}")
-        import traceback
-
-        logging.error(traceback.format_exc())
 
     yield
     logging.info("应用关闭，清理资源...")

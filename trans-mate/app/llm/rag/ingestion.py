@@ -42,14 +42,6 @@ class DocumentIngestion:
             )
         return self._embedding_model
 
-    def _get_chroma_client(self):
-        if self._chroma_client is None:
-            os.makedirs(self.config["chroma_store_dir"], exist_ok=True)
-            self._chroma_client = chromadb.PersistentClient(
-                path=self.config["chroma_store_dir"]
-            )
-        return self._chroma_client
-
     def load_documents(self) -> List[Document]:
         knowledge_dir = self.config["knowledge_dir"]
         if not os.path.exists(knowledge_dir):
