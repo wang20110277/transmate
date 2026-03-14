@@ -6,67 +6,76 @@
       {{ connectionStatusText }}
     </div>
 
-    <div class="container">
-      <div class="avatar-panel">
-        <div id="video-container">
-          <div id="remoteVideo" style="width:100%;height:100%;"></div>
-          <canvas id="canvas" style="max-width: 1920px; height: 1080px; background-color: transparent;" hidden="hidden"></canvas>
-          <canvas id="tmpCanvas" style="max-width: 1920px; height: 1080px;" hidden="hidden"></canvas>
-        </div>
-        <div class="subtitle-wrapper-home">
-          <ScrollSubtitle :text="spokenText" v-if="spokenText" @complete="spokenText = ''" />
-        </div>
-      </div>
+    <div class="main-container">
+      <!-- 左侧面板：知识 + 记忆 -->
+      <AppLeft :collapsed="leftPanelCollapsed" @update:collapsed="leftPanelCollapsed = $event" />
 
-      <div class="chat-container">
-        <div class="tabs">
-          <button :class="['tab-button', { active: activeTab === 'chat' }]" @click="activeTab = 'chat'">对话</button>
+      <!-- 中间主内容区 -->
+      <div class="center-content">
+        <div class="avatar-panel">
+          <div id="video-container">
+            <div id="remoteVideo" style="width:100%;height:100%;"></div>
+            <canvas id="canvas" style="max-width: 1920px; height: 1080px; background-color: transparent;" hidden="hidden"></canvas>
+            <canvas id="tmpCanvas" style="max-width: 1920px; height: 1080px;" hidden="hidden"></canvas>
+          </div>
+          <div class="subtitle-wrapper-home">
+            <ScrollSubtitle :text="spokenText" v-if="spokenText" @complete="spokenText = ''" />
+          </div>
         </div>
-        <div class="tab-content">
-          <div v-show="activeTab === 'chat'" class="tab-pane">
-            <div class="dialogue-container" ref="dialogueContainer">
-              <div v-if="showError" class="error-message" @click="hideError">
-                <i class="fas fa-exclamation-triangle"></i>
-                {{ errorMessage }}
-                <span class="close-btn">×</span>
-              </div>
-              <div v-if="dialogue.length === 0" class="message role-assistant welcome-msg">
-                <div class="message-content">你好，我是阿雅，您的专属理财助手，有什么可以帮助您？</div>
-              </div>
-              <div v-for="(message, index) in dialogue"
-                   :key="index"
-                   :class="['message', 'role-' + (message.role || 'system')]">
-                <div class="message-content">{{ message.content || '无内容' }}</div>
-                <div class="timestamp">{{ formatTime(message.timestamp || Date.now()) }}</div>
-                <div v-if="message.role === 'user' && isProcessing && index === dialogue.length - 1"
-                     class="processing-indicator">
-                  <div class="processing-content">
-                    <div class="dots">
-                      <span></span><span></span><span></span>
+
+        <div class="chat-container">
+          <div class="tabs">
+            <button :class="['tab-button', { active: activeTab === 'chat' }]" @click="activeTab = 'chat'">对话</button>
+          </div>
+          <div class="tab-content">
+            <div v-show="activeTab === 'chat'" class="tab-pane">
+              <div class="dialogue-container" ref="dialogueContainer">
+                <div v-if="showError" class="error-message" @click="hideError">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  {{ errorMessage }}
+                  <span class="close-btn">×</span>
+                </div>
+                <div v-if="dialogue.length === 0" class="message role-assistant welcome-msg">
+                  <div class="message-content">你好，我是阿雅，您的专属理财助手，有什么可以帮助您？</div>
+                </div>
+                <div v-for="(message, index) in dialogue"
+                     :key="index"
+                     :class="['message', 'role-' + (message.role || 'system')]">
+                  <div class="message-content">{{ message.content || '无内容' }}</div>
+                  <div class="timestamp">{{ formatTime(message.timestamp || Date.now()) }}</div>
+                  <div v-if="message.role === 'user' && isProcessing && index === dialogue.length - 1"
+                       class="processing-indicator">
+                    <div class="processing-content">
+                      <div class="dots">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span class="processing-text">{{ processingStatus || '正在思考中...' }}</span>
                     </div>
-                    <span class="processing-text">{{ processingStatus || '正在思考中...' }}</span>
                   </div>
                 </div>
               </div>
-            </div>
-            <div class="input-area">
-              <input type="text"
-                     class="text-input"
-                     v-model="newMessage"
-                     placeholder="请输入您的问题..."
-                     @keyup.enter="sendMessage"
-                     autocomplete="off">
-              <button class="send-btn" @click="sendMessage" :disabled="isProcessing">发送</button>
-              <button :class="['record-btn', {recording: isRecording}]" @click="toggleRecording" :disabled="isProcessing">
-                <i :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
-              </button>
-              <button class="video-call-btn" @click="startVideoCall" :disabled="!isConnected || isCallActive">
-                <i class="fas fa-video"></i>
-              </button>
+              <div class="input-area">
+                <input type="text"
+                       class="text-input"
+                       v-model="newMessage"
+                       placeholder="请输入您的问题..."
+                       @keyup.enter="sendMessage"
+                       autocomplete="off">
+                <button class="send-btn" @click="sendMessage" :disabled="isProcessing">发送</button>
+                <button :class="['record-btn', {recording: isRecording}]" @click="toggleRecording" :disabled="isProcessing">
+                  <i :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
+                </button>
+                <button class="video-call-btn" @click="startVideoCall" :disabled="!isConnected || isCallActive">
+                  <i class="fas fa-video"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- 右侧面板：SKILLS + MCPs -->
+      <AppRight :collapsed="rightPanelCollapsed" @update:collapsed="rightPanelCollapsed = $event" />
     </div>
 
     <!-- AppFooter removed -->
@@ -78,6 +87,8 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import AppHeader from '../components/AppHeader.vue';
+import AppLeft from '../components/AppLeft.vue';
+import AppRight from '../components/AppRight.vue';
 import ScrollSubtitle from '../components/ScrollSubtitle.vue';
 import {
   getOrCreateSpeechConfig,
@@ -110,6 +121,10 @@ const isRecording = ref<boolean>(false);
 const isCallActive = ref<boolean>(false);
 const dialogueContainer = ref<HTMLDivElement | null>(null);
 const userName = ref<string>('用户');
+
+// 侧边面板折叠状态
+const leftPanelCollapsed = ref(false);
+const rightPanelCollapsed = ref(false);
 
 const handleLogout = async () => {
   await userStore.logoutUser();
@@ -443,11 +458,11 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--color-border);
 }
 
-.home-layout .container {
+.home-layout .main-container {
   display: flex;
   flex: 1;
   overflow: hidden;
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   width: 100%;
   padding: 1rem;
@@ -455,12 +470,22 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
+/* 中间内容区 - 左右结构 */
+.home-layout .center-content {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .home-layout .avatar-panel {
   flex: 1;
   background: #0f172a;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  min-height: 420px;
+  min-width: 400px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -522,8 +547,7 @@ onUnmounted(() => {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-lg);
-  min-height: 420px;
-  width: 100%;
+  min-width: 350px;
   border: 1px solid var(--color-border);
 }
 
@@ -745,15 +769,20 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
-  .home-layout .container {
+  .home-layout .main-container {
     flex-direction: column;
     padding: 0.75rem;
   }
+  .home-layout .center-content {
+    flex-direction: column;
+  }
   .home-layout .avatar-panel {
     min-height: 280px;
+    min-width: 100%;
   }
   .home-layout .chat-container {
     min-height: 360px;
+    min-width: 100%;
   }
 }
 
