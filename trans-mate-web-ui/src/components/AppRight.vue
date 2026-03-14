@@ -27,8 +27,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-
 const props = defineProps<{
   collapsed?: boolean;
 }>();
@@ -37,11 +35,8 @@ const emit = defineEmits<{
   (e: 'update:collapsed', value: boolean): void;
 }>();
 
-const localCollapsed = ref(props.collapsed ?? false);
-
 const toggleCollapse = () => {
-  localCollapsed.value = !localCollapsed.value;
-  emit('update:collapsed', localCollapsed.value);
+  emit('update:collapsed', !props.collapsed);
 };
 </script>
 

@@ -108,7 +108,6 @@ import { Message, WebSocketMessage, ParsedWebSocketMessage } from '../types';
 const router = useRouter();
 const userStore = useUserStore();
 
-const userId = 'user_' + Math.random().toString(36).substring(2, 11);
 const activeTab = ref<string>('chat');
 const dialogue = ref<Message[]>([]);
 const newMessage = ref<string>('');
