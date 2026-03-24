@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
 
 from app.llm.agents.base_agent import base_agent
-from app.llm.agents.stock_agent import stock_data_agent
+from app.llm.agents.stock_agent import stock_agent
 from app.llm.agents.rag_agent import rag_agent
 
 logger = logging.getLogger(__name__)
@@ -139,9 +139,7 @@ async def call_stock_agent(state: AgentState) -> AgentState:
     if not user_input:
         return state
 
-    result = await stock_data_agent.ainvoke(
-        {"messages": [HumanMessage(content=user_input)]}
-    )
+    result = await stock_agent.ainvoke({"messages": [HumanMessage(content=user_input)]})
     response_content = result["messages"][-1].content
 
     new_messages = messages + [AIMessage(content=response_content)]

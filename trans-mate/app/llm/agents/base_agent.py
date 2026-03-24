@@ -17,6 +17,5 @@ system_prompt = """
 base_agent = create_agent(
     model=model,
     tools=[get_weather, web_search],
-    system_prompt=system_prompt,
-    # debug=True,
+    system_prompt=system_prompt
 )

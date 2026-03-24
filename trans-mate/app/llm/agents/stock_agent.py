@@ -1,13 +1,6 @@
 from langchain.agents import create_agent
 from app.llm.models.qwen_model import ModelPool
-from app.llm.tools import (
-    get_stock_info,
-    get_stock_daily,
-    get_stock_realtime,
-    get_index_daily,
-    get_stock_daily_basic,
-    search_stock,
-)
+from app.llm.tools import get_stock_info,get_stock_daily,get_stock_realtime,get_index_daily,get_stock_daily_basic,search_stock
 
 model = ModelPool()
 
@@ -34,6 +27,5 @@ stock_data_agent = create_agent(
         get_stock_daily_basic,
         search_stock,
     ],
-    system_prompt=system_prompt,
-    debug=True,
+    system_prompt=system_prompt
 )
