@@ -4,7 +4,7 @@ import { getCurrentUser, logout } from '@/services/api'
 
 export interface UserInfo {
   id: number
-  username: string
+  user_id: string
   nickname?: string
   avatar_url?: string
   phone?: string
@@ -64,7 +64,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user_id')
     localStorage.removeItem('device_id')
-    localStorage.removeItem('username')
+    localStorage.removeItem('user_id')
     localStorage.removeItem('is_first_login')
   }
 

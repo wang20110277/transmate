@@ -1,6 +1,6 @@
 <template>
   <div class="personal-center">
-    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.username || '用户'" @logout="handleLogout" />
+    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.user_id || '用户'" @logout="handleLogout" />
 
     <div class="page-content">
       <div class="page-header">
@@ -22,8 +22,8 @@
                 </div>
 
                 <div class="info-item">
-                  <span class="info-label">用户名</span>
-                  <span class="info-value">{{ userInfo.username || '-' }}</span>
+                  <span class="info-label">用户ID</span>
+                  <span class="info-value">{{ userCode || userInfo.user_id || '-' }}</span>
                 </div>
 
                 <div class="info-item">
@@ -117,12 +117,15 @@ const showPasswordDialog = ref(false)
 // 用户信息
 const userInfo = computed(() => {
   return userStore.userInfo || {
-    username: '',
+    user_id: '',
     nickname: '',
     phone: '',
     is_password_set: false
   }
 })
+
+// 用户ID标识
+const userCode = computed(() => localStorage.getItem('user_code'))
 
 // 手机号脱敏显示
 const maskedPhone = computed(() => {

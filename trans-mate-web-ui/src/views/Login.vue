@@ -216,7 +216,7 @@ const canSubmit = computed(() => {
 // 存储登录凭证
 const saveAuthData = (data: {
   id: number
-  username: string
+  user_id: string
   access_token: string
   refresh_token: string
   device_id: string
@@ -228,7 +228,7 @@ const saveAuthData = (data: {
   localStorage.setItem('refresh_token', data.refresh_token)
   localStorage.setItem('user_id', String(data.id))
   localStorage.setItem('device_id', data.device_id)
-  localStorage.setItem('username', data.username)
+  localStorage.setItem('user_code', data.user_id)
   localStorage.setItem('is_first_login', String(data.is_first_login))
 }
 

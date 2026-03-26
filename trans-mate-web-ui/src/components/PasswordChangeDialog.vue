@@ -181,7 +181,7 @@ const handleRelogin = () => {
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('user_id')
   localStorage.removeItem('device_id')
-  localStorage.removeItem('username')
+  localStorage.removeItem('user_code')
 
   // 跳转到登录页
   window.location.href = '/login'

@@ -1,6 +1,6 @@
 <template>
   <div class="home-layout">
-    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.username || userName" @logout="handleLogout" />
+    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.user_id || userId" @logout="handleLogout" />
 
     <div :class="`connection-status ${connectionStatus}`" hidden>
       {{ connectionStatusText }}
@@ -119,7 +119,7 @@ const processingStatus = ref<string>('');
 const isRecording = ref<boolean>(false);
 const isCallActive = ref<boolean>(false);
 const dialogueContainer = ref<HTMLDivElement | null>(null);
-const userName = ref<string>('用户');
+const userId = ref<string>('用户');
 
 // 侧边面板折叠状态
 const leftPanelCollapsed = ref(false);
@@ -149,7 +149,7 @@ const connectionStatusText = ref('未连接');
 const connectWebSocket = () => {
   if (socket.value && socket.value.readyState === WebSocket.OPEN) return;
   const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const wsUrl = `${protocol}${window.location.host}/ws?user_name=${userName.value}`;
+  const wsUrl = `${protocol}${window.location.host}/ws?user_id=${userId.value}`;
   try {
     socket.value = new WebSocket(wsUrl);
     socket.value.onopen = () => {
@@ -396,7 +396,7 @@ onMounted(async () => {
   // 初始化用户状态
   userStore.initFromStorage();
   if (userStore.userInfo) {
-    userName.value = userStore.userInfo.username;
+    userId.value = localStorage.getItem('user_code') || userStore.userInfo.user_id;
   }
 
   connectWebSocket();

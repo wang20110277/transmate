@@ -17,7 +17,7 @@ system_prompt = """
 - search_stock: 搜索股票
 """
 
-stock_data_agent = create_agent(
+stock_agent = create_agent(
     model=model,
     tools=[
         get_stock_info,

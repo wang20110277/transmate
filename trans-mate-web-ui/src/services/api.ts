@@ -70,7 +70,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user_id')
         localStorage.removeItem('device_id')
-        localStorage.removeItem('username')
+        localStorage.removeItem('user_id')
 
         window.location.href = '/login'
         return Promise.reject(refreshError)
@@ -85,7 +85,7 @@ apiClient.interceptors.response.use(
 
 export interface LoginResponse {
   id: number
-  username: string
+  user_id: string
   access_token: string
   refresh_token: string
   device_id: string
@@ -99,7 +99,7 @@ export interface SMSCodeResponse {
 
 export interface UserInfo {
   id: number
-  username: string
+  user_id: string
   nickname?: string
   avatar_url?: string
   phone?: string
