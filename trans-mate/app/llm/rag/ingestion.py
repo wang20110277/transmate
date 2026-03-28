@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from pathlib import Path
 from typing import List, Optional
 
 import chromadb
@@ -19,6 +20,11 @@ from app.core.config import (
 
 logger = logging.getLogger(__name__)
 
+# 配置 HuggingFace 模型缓存目录
+HF_CACHE_DIR = os.getenv("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
+os.environ.setdefault("HF_HOME", HF_CACHE_DIR)
+logger.info(f"HuggingFace cache directory: {HF_CACHE_DIR}")
+
 
 class DocumentIngestion:
     def __init__(self):
@@ -36,10 +42,13 @@ class DocumentIngestion:
     @property
     def embedding_model(self):
         if self._embedding_model is None:
+            logger.info(f"Loading embedding model: {self.config['embedding_model']}")
             self._embedding_model = HuggingFaceEmbedding(
                 model_name=self.config["embedding_model"],
                 device="cpu",
+                cache_folder=HF_CACHE_DIR,
             )
+            logger.info("Embedding model loaded successfully")
         return self._embedding_model
 
     def load_documents(self) -> List[Document]:
