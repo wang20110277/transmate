@@ -44,3 +44,6 @@ ENV/
 
 # RAG Vector Store
 store/
+
+# HuggingFace Models
+app/llm/rag/models/

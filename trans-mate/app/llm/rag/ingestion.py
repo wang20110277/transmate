@@ -1,8 +1,10 @@
 import logging
 import os
-import shutil
 from pathlib import Path
 from typing import List, Optional
+import shutil
+
+logger = logging.getLogger(__name__)
 
 import chromadb
 from llama_index.core import Document, VectorStoreIndex, StorageContext
@@ -17,13 +19,6 @@ from app.core.config import (
     RAG_TOP_K,
     RAG_SIMILARITY_THRESHOLD,
 )
-
-logger = logging.getLogger(__name__)
-
-# 配置 HuggingFace 模型缓存目录
-HF_CACHE_DIR = os.getenv("HF_HOME", str(Path.home() / ".cache" / "huggingface"))
-os.environ.setdefault("HF_HOME", HF_CACHE_DIR)
-logger.info(f"HuggingFace cache directory: {HF_CACHE_DIR}")
 
 
 class DocumentIngestion:
@@ -42,12 +37,25 @@ class DocumentIngestion:
     @property
     def embedding_model(self):
         if self._embedding_model is None:
-            logger.info(f"Loading embedding model: {self.config['embedding_model']}")
-            self._embedding_model = HuggingFaceEmbedding(
-                model_name=self.config["embedding_model"],
-                device="cpu",
-                cache_folder=HF_CACHE_DIR,
+            model_name = self.config["embedding_model"]
+
+            cache_dir = os.environ.get("HF_HOME", str(Path(__file__).parent / "models"))
+
+            local_model_path = (
+                Path(cache_dir) / f"models--{model_name.replace('/', '--')}"
             )
+            local_files_only = local_model_path.exists()
+
+            logger.info(f"Loading embedding model: {model_name}")
+            logger.info(f"Cache dir: {cache_dir}, local_files_only: {local_files_only}")
+
+            self._embedding_model = HuggingFaceEmbedding(
+                model_name=model_name,
+                device="cpu",
+                cache_folder=cache_dir,
+                local_files_only=local_files_only,
+            )
+
             logger.info("Embedding model loaded successfully")
         return self._embedding_model
 
