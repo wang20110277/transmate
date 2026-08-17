@@ -133,8 +133,16 @@ defineEmits<{
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
 }
 
+.action-round.mic {
+  font-size: 17px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
 .action-round.mic.recording {
   color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
   border-color: #ef4444;
   animation: mic-pulse 1.2s infinite;
 }

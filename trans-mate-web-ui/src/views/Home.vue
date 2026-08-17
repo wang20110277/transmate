@@ -60,7 +60,7 @@
             :title="ttsEnabled ? '关闭语音播报' : '开启语音播报'"
             @click="toggleTts"
           >
-            <i :class="isSpeaking ? 'fas fa-volume-high' : (ttsEnabled ? 'fas fa-volume-high' : 'fas fa-volume-xmark')"></i>
+            <i :class="ttsEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute'"></i>
           </button>
         </div>
         <div v-if="showError" class="error-message" @click="hideError">
@@ -98,9 +98,8 @@
               {{ avatarSessionActive ? '数字人已就绪' : '数字人未连接' }}
             </div>
           </div>
-          <span class="conn-dot" :class="isConnected ? 'online' : 'offline'"></span>
-          <button class="avatar-panel-btn" title="重新连接数字人" @click="restartAvatar">
-            <i class="fas fa-rotate-right"></i>
+          <button class="avatar-reconnect-btn" title="重新连接数字人" @click="restartAvatar">
+            <i class="fas fa-sync-alt"></i>
           </button>
           <button class="avatar-panel-btn" title="收起面板" @click="avatarCollapsed = true">
             <i class="fas fa-chevron-right"></i>
@@ -277,7 +276,7 @@ const playTts = async (text: string) => {
   try {
     isSpeaking.value = true;
     const response = await synthesizeSpeech(clean.slice(0, 500));
-    const contentType = response.headers?.['content-type'] || 'audio/mpeg';
+    const contentType = String(response.headers?.['content-type'] || 'audio/mpeg');
     const blob = new Blob([response.data], { type: contentType });
     const url = URL.createObjectURL(blob);
     stopAudio();
@@ -634,25 +633,53 @@ onUnmounted(() => {
   box-shadow: var(--shadow-lg);
 }
 
+.home-layout .avatar-reconnect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  color: #1e40af;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  transition: all var(--transition);
+}
+
+.home-layout .avatar-reconnect-btn:hover {
+  background: #eff6ff;
+  transform: scale(1.08);
+}
+
+.home-layout .avatar-reconnect-btn:active {
+  transform: scale(0.97);
+}
+
 .home-layout .avatar-panel-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
   cursor: pointer;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   transition: all var(--transition);
 }
 
 .home-layout .avatar-panel-btn:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(1.08);
 }
 
 /* 折叠后的展开把手（贴右缘竖条） */
@@ -739,23 +766,8 @@ onUnmounted(() => {
 }
 
 .home-layout .status-dot.off {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.home-layout .conn-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.home-layout .conn-dot.online {
-  background: #4ade80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.9);
-}
-
-.home-layout .conn-dot.offline {
-  background: #f87171;
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.7);
 }
 
 .home-layout #video-container {
@@ -819,19 +831,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
   border-radius: 50%;
   cursor: pointer;
   transition: all var(--transition);
 }
 
+.home-layout .tts-toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .home-layout .tts-toggle.active {
   color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.55);
 }
 
 .home-layout .tts-toggle.speaking {

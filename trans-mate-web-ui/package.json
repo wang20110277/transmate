@@ -14,7 +14,8 @@
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && electron .\"",
     "start": "electron-forge start",
     "package": "npm run build:web && electron-forge package",
-    "make": "npm run build:web && electron-forge make"
+    "make": "npm run build:web && electron-forge make",
+    "publish": "npm run build:web && electron-forge publish"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -38,6 +39,7 @@
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron-forge/publisher-github": "^7.11.2",
     "@electron/fuses": "^1.8.0",
     "@types/axios": "^0.9.36",
     "@types/markdown-it": "^14.1.2",
@@ -51,7 +53,5 @@
     "vue-tsc": "^2.2.12",
     "wait-on": "^9.1.0"
   },
-  "allowScripts": {
-    "esbuild@0.28.2": true
-  }
+  "allowScripts": {}
 }

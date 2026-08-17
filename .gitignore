@@ -2,3 +2,17 @@
 node_modules/
 dist/
 *.log
+
+# 环境变量（含密钥，不入库；模板见 .env.example）
+.env
+trans-mate/.env
+trans-mate-web-ui/.env
+
+# Python 运行产物
+__pycache__/
+*.pyc
+.venv/
+
+# RAG 向量库与测试产物
+trans-mate/store/
+gui-test-screenshots/
