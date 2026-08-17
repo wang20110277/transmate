@@ -65,14 +65,13 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest)
         }
       } catch (refreshError) {
-        // 刷新失败，清除token并跳转到登录页
+        // 刷新失败，清除token
         localStorage.removeItem('token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('user_id')
         localStorage.removeItem('device_id')
         localStorage.removeItem('user_id')
 
-        window.location.href = '/login'
         return Promise.reject(refreshError)
       }
     }
@@ -217,6 +216,73 @@ export const getWechatLoginStatus = (sceneId: string): Promise<AxiosResponse<Log
 // 微信扫码登录（用 auth_code 换取 token）
 export const wechatQRLogin = (authCode: string): Promise<AxiosResponse<LoginResponse>> => {
   return apiClient.post('/api/auth/wechat/qr-login', { code: authCode })
+}
+
+// ==================== 会话（智能体）接口 ====================
+
+export interface Conversation {
+  id: number
+  user_id: string
+  title: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ConversationMessage {
+  id: number
+  conversation_id: number
+  role: string
+  content: string
+  tool_events?: string | null
+  created_at?: string
+}
+
+// 获取用户会话列表
+export const listConversations = (userId: string): Promise<AxiosResponse<Conversation[]>> => {
+  return apiClient.get('/api/conversations', { params: { user_id: userId } })
+}
+
+// 创建新会话
+export const createConversation = (userId: string, title?: string): Promise<AxiosResponse<Conversation>> => {
+  return apiClient.post('/api/conversations', { user_id: userId, title: title || '新会话' })
+}
+
+// 重命名会话
+export const renameConversation = (
+  conversationId: number,
+  title: string
+): Promise<AxiosResponse<Conversation>> => {
+  return apiClient.put(`/api/conversations/${conversationId}`, { title })
+}
+
+// 删除会话
+export const deleteConversation = (conversationId: number): Promise<AxiosResponse<{ message: string }>> => {
+  return apiClient.delete(`/api/conversations/${conversationId}`)
+}
+
+// 获取会话历史消息
+export const listConversationMessages = (
+  conversationId: number
+): Promise<AxiosResponse<ConversationMessage[]>> => {
+  return apiClient.get(`/api/conversations/${conversationId}/messages`)
+}
+
+// ==================== 语音转写（ASR）接口 ====================
+
+// 上传录音 blob，返回识别文本
+export const transcribeAudio = (audio: Blob): Promise<AxiosResponse<{ success: boolean; text: string }>> => {
+  return apiClient.post('/api/asr/transcribe', audio, {
+    headers: { 'Content-Type': 'audio/webm' },
+    timeout: 60000
+  })
+}
+
+// 文本合成语音，返回 WAV 音频 blob
+export const synthesizeSpeech = (text: string): Promise<AxiosResponse<Blob>> => {
+  return apiClient.post('/api/tts/synthesize', { text }, {
+    responseType: 'blob',
+    timeout: 180000
+  })
 }
 
 export default apiClient

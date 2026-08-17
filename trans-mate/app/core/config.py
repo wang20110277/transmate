@@ -4,6 +4,7 @@
 """
 
 import os
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,7 +24,11 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_DRIVER = os.getenv("DB_DRIVER", "postgresql+psycopg2")
+DATABASE_URL = (
+    f"{DB_DRIVER}://{DB_USER}:{quote_plus(DB_PASSWORD or '')}"
+    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = os.getenv("REDIS_PORT")
@@ -84,3 +89,10 @@ RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.5"))
 
 # RAGAS Evaluation Configuration
 RAGAS_API_KEY = os.getenv("RAGAS_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+
+# ASR 语音转写服务（freeswitch-asr）
+ASR_BASE_URL = os.getenv("ASR_BASE_URL", "http://127.0.0.1:8002")
+
+# TTS 语音合成服务（freeswitch-tts，CosyVoice3 24kHz）
+TTS_WS_URL = os.getenv("TTS_WS_URL", "ws://127.0.0.1:8003/ws/tts")
+TTS_PROMPT_WAV = os.getenv("TTS_PROMPT_WAV", "./asset/zero_shot_prompt.wav")

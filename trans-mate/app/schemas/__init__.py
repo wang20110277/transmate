@@ -16,6 +16,12 @@ from app.schemas.auth import (
     ChangePasswordRequest,
 )
 from app.schemas.user import UserInfoResponse
+from app.schemas.chat import (
+    ConversationCreate,
+    ConversationUpdate,
+    ConversationResponse,
+    MessageResponse,
+)
 
 __all__ = [
     # Auth schemas
@@ -32,4 +38,9 @@ __all__ = [
     "ChangePasswordRequest",
     # User schemas
     "UserInfoResponse",
+    # Chat schemas
+    "ConversationCreate",
+    "ConversationUpdate",
+    "ConversationResponse",
+    "MessageResponse",
 ]

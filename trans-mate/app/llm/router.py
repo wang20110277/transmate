@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage
@@ -7,6 +8,9 @@ from app.llm.agents.stock_agent import stock_agent
 from app.llm.agents.rag_agent import rag_agent
 
 logger = logging.getLogger(__name__)
+
+# RAG 检索（含 embedding 模型首次加载）超过该秒数则跳过知识库，避免阻塞对话
+RAG_RETRIEVAL_TIMEOUT = 15
 
 
 class AgentState(dict):
@@ -30,17 +34,22 @@ def get_user_input(state: AgentState) -> str:
         return str(last_message)
 
 
-def try_rag_retrieval(state: AgentState) -> dict:
-    """优先尝试RAG检索，如果能回答则直接返回"""
+async def try_rag_retrieval(state: AgentState) -> dict:
+    """优先尝试RAG检索，如果能回答则直接返回（带超时保护，在线程池中执行）"""
     user_input = get_user_input(state)
     if not user_input:
         return {"rag_available": False}
 
     try:
-        success, rag_response = rag_agent.retrieve(user_input)
+        success, rag_response = await asyncio.wait_for(
+            asyncio.to_thread(rag_agent.retrieve, user_input),
+            timeout=RAG_RETRIEVAL_TIMEOUT,
+        )
         if success and rag_response:
             logger.info(f"RAG successfully retrieved answer for: {user_input}")
             return {"rag_available": True, "rag_response": rag_response}
+    except asyncio.TimeoutError:
+        logger.warning("RAG retrieval timed out, falling back to classifier")
     except Exception as e:
         logger.error(f"RAG retrieval error: {e}")
 
@@ -117,14 +126,14 @@ async def call_rag_agent(state: AgentState) -> AgentState:
 
 
 async def call_base_agent(state: AgentState) -> AgentState:
-    """调用通用代理"""
+    """调用通用代理（携带完整对话历史）"""
     messages = state.get("messages", [])
     user_input = get_user_input(state)
 
     if not user_input:
         return state
 
-    result = await base_agent.ainvoke({"messages": [HumanMessage(content=user_input)]})
+    result = await base_agent.ainvoke({"messages": messages})
     response_content = result["messages"][-1].content
 
     new_messages = messages + [AIMessage(content=response_content)]
@@ -132,14 +141,14 @@ async def call_base_agent(state: AgentState) -> AgentState:
 
 
 async def call_stock_agent(state: AgentState) -> AgentState:
-    """调用股票数据代理"""
+    """调用股票数据代理（携带完整对话历史）"""
     messages = state.get("messages", [])
     user_input = get_user_input(state)
 
     if not user_input:
         return state
 
-    result = await stock_agent.ainvoke({"messages": [HumanMessage(content=user_input)]})
+    result = await stock_agent.ainvoke({"messages": messages})
     response_content = result["messages"][-1].content
 
     new_messages = messages + [AIMessage(content=response_content)]

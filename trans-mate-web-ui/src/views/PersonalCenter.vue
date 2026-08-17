@@ -1,6 +1,6 @@
 <template>
   <div class="personal-center">
-    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.user_id || '用户'" @logout="handleLogout" />
+    <AppHeader />
 
     <div class="page-content">
       <div class="page-header">
@@ -99,7 +99,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { Edit } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getCurrentUser } from '@/services/api'
@@ -108,7 +107,6 @@ import PasswordChangeDialog from '@/components/PasswordChangeDialog.vue'
 import AppHeader from '@/components/AppHeader.vue'
 
 const userStore = useUserStore()
-const router = useRouter()
 
 const activeTab = ref('basic')
 const showNicknameDialog = ref(false)
@@ -148,12 +146,6 @@ const handleNicknameSuccess = async (nickname: string) => {
 // 密码修改成功
 const handlePasswordSuccess = () => {
   // 密码修改后会提示重新登录，这里不需要额外处理
-}
-
-// 处理登出
-const handleLogout = async () => {
-  await userStore.logoutUser()
-  router.push('/login')
 }
 
 // 刷新用户信息

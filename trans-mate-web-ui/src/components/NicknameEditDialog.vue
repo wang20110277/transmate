@@ -66,7 +66,7 @@ const rules: FormRules = {
   nickname: [
     { required: true, message: '请输入昵称', trigger: 'blur' },
     {
-      validator: (rule: any, value: string, callback: Function) => {
+      validator: (_rule: any, value: string, callback: Function) => {
         if (!value || !value.trim()) {
           callback(new Error('昵称不能为空'))
         } else if (value.length > 10) {

@@ -1,95 +1,146 @@
 <template>
   <div class="home-layout">
-    <AppHeader :user-name="userStore.userInfo?.nickname || userStore.userInfo?.user_id || userId" @logout="handleLogout" />
-
-    <div :class="`connection-status ${connectionStatus}`" hidden>
-      {{ connectionStatusText }}
-    </div>
-
     <div class="main-container">
-      <!-- 左侧面板：知识 + 记忆 -->
-      <AppLeft :collapsed="leftPanelCollapsed" @update:collapsed="leftPanelCollapsed = $event" />
-
-      <!-- 中间主内容区 -->
-      <div class="center-content">
-        <div class="avatar-panel">
-          <div id="video-container">
-            <div id="remoteVideo" style="width:100%;height:100%;"></div>
-            <canvas id="canvas" style="max-width: 1920px; height: 1080px; background-color: transparent;" hidden="hidden"></canvas>
-            <canvas id="tmpCanvas" style="max-width: 1920px; height: 1080px;" hidden="hidden"></canvas>
-          </div>
-          <div class="subtitle-wrapper-home">
-            <ScrollSubtitle :text="spokenText" v-if="spokenText" @complete="spokenText = ''" />
-          </div>
+      <!-- 最左：图标功能栏（含原头部内容） -->
+      <div class="icon-rail">
+        <div class="rail-top">
+          <span class="rail-logo">
+            <img src="/icons/logo.svg" alt="logo" class="rail-logo-img">
+          </span>
         </div>
-
-        <div class="chat-container">
-          <div class="tabs">
-            <button :class="['tab-button', { active: activeTab === 'chat' }]" @click="activeTab = 'chat'">对话</button>
-          </div>
-          <div class="tab-content">
-            <div v-show="activeTab === 'chat'" class="tab-pane">
-              <div class="dialogue-container" ref="dialogueContainer">
-                <div v-if="showError" class="error-message" @click="hideError">
-                  <i class="fas fa-exclamation-triangle"></i>
-                  {{ errorMessage }}
-                  <span class="close-btn">×</span>
-                </div>
-                <div v-if="dialogue.length === 0" class="message role-assistant welcome-msg">
-                  <div class="message-content">你好，我是阿雅，您的专属理财助手，有什么可以帮助您？</div>
-                </div>
-                <div v-for="(message, index) in dialogue"
-                     :key="index"
-                     :class="['message', 'role-' + (message.role || 'system')]">
-                  <div class="message-content">{{ message.content || '无内容' }}</div>
-                  <div class="timestamp">{{ formatTime(message.timestamp || Date.now()) }}</div>
-                  <div v-if="message.role === 'user' && isProcessing && index === dialogue.length - 1"
-                       class="processing-indicator">
-                    <div class="processing-content">
-                      <div class="dots">
-                        <span></span><span></span><span></span>
-                      </div>
-                      <span class="processing-text">{{ processingStatus || '正在思考中...' }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="input-area">
-                <input type="text"
-                       class="text-input"
-                       v-model="newMessage"
-                       placeholder="请输入您的问题..."
-                       @keyup.enter="sendMessage"
-                       autocomplete="off">
-                <button class="send-btn" @click="sendMessage" :disabled="isProcessing">发送</button>
-                <button :class="['record-btn', {recording: isRecording}]" @click="toggleRecording" :disabled="isProcessing">
-                  <i :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
-                </button>
-                <button class="video-call-btn" @click="startVideoCall" :disabled="!isConnected || isCallActive">
-                  <i class="fas fa-video"></i>
-                </button>
-              </div>
-            </div>
-          </div>
+        <div class="rail-actions">
+          <button class="rail-btn" title="新会话" @click="newConversation">
+            <i class="fas fa-plus"></i>
+          </button>
+          <button
+            :class="['rail-btn', { active: showConversations }]"
+            title="历史会话"
+            @click="showConversations = !showConversations"
+          >
+            <i class="fas fa-history"></i>
+          </button>
+          <button
+            :class="['rail-btn', { active: !avatarCollapsed }]"
+            title="数字人面板"
+            @click="avatarCollapsed = !avatarCollapsed"
+          >
+            <i class="fas fa-video"></i>
+          </button>
+        </div>
+        <div class="rail-bottom">
+          <button class="rail-btn" title="主页" @click="goHome">
+            <i class="fas fa-home"></i>
+          </button>
+          <button class="rail-btn rail-avatar" title="个人中心" @click="goSettings">
+            <i class="fas fa-user"></i>
+          </button>
         </div>
       </div>
 
-      <!-- 右侧面板：SKILLS + MCPs -->
-      <AppRight :collapsed="rightPanelCollapsed" @update:collapsed="rightPanelCollapsed = $event" />
-    </div>
+      <!-- 历史会话面板（点击图标展开） -->
+      <div v-show="showConversations" class="conv-panel">
+        <ChatSidebar
+          :conversations="conversations"
+          :current-conversation-id="currentConversationId"
+          @new-conversation="newConversation"
+          @select-conversation="selectConversation"
+          @remove-conversation="removeConversation"
+        />
+      </div>
 
-    <!-- AppFooter removed -->
+      <!-- 中间：智能体对话（主区） -->
+      <div class="chat-container">
+        <div class="chat-title-bar">
+          <span class="chat-title">
+            <i class="fas fa-robot"></i>
+            欢迎使用 TransMate 智能助手
+          </span>
+          <button
+            :class="['tts-toggle', { active: ttsEnabled, speaking: isSpeaking }]"
+            :title="ttsEnabled ? '关闭语音播报' : '开启语音播报'"
+            @click="toggleTts"
+          >
+            <i :class="isSpeaking ? 'fas fa-volume-high' : (ttsEnabled ? 'fas fa-volume-high' : 'fas fa-volume-xmark')"></i>
+          </button>
+        </div>
+        <div v-if="showError" class="error-message" @click="hideError">
+          <i class="fas fa-exclamation-triangle"></i>
+          {{ errorMessage }}
+          <span class="close-btn">×</span>
+        </div>
+        <MessageList
+          :messages="dialogue"
+          :is-processing="isProcessing"
+          :processing-status="processingStatus"
+        />
+        <ChatInput
+          v-model="newMessage"
+          :is-processing="isProcessing"
+          :is-recording="isRecording"
+          :is-transcribing="isTranscribing"
+          :disabled="!isConnected"
+          @send="sendMessage"
+          @stop="stopGeneration"
+          @toggle-recording="toggleRecording"
+        />
+      </div>
+
+      <!-- 最右：数字人面板（可折叠） -->
+      <div v-show="!avatarCollapsed" class="avatar-panel">
+        <div class="avatar-topbar">
+          <span class="avatar-user-avatar">
+            <i class="fas fa-user"></i>
+          </span>
+          <div class="avatar-user-info">
+            <div class="avatar-user-name">{{ displayName }}</div>
+            <div class="avatar-user-status">
+              <span :class="['status-dot', avatarSessionActive ? 'on' : 'off']"></span>
+              {{ avatarSessionActive ? '数字人已就绪' : '数字人未连接' }}
+            </div>
+          </div>
+          <span class="conn-dot" :class="isConnected ? 'online' : 'offline'"></span>
+          <button class="avatar-panel-btn" title="重新连接数字人" @click="restartAvatar">
+            <i class="fas fa-rotate-right"></i>
+          </button>
+          <button class="avatar-panel-btn" title="收起面板" @click="avatarCollapsed = true">
+            <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+
+        <div id="video-container">
+          <div id="remoteVideo" style="width:100%;height:100%;"></div>
+          <canvas id="canvas" style="max-width: 1920px; height: 1080px; background-color: transparent;" hidden="hidden"></canvas>
+          <canvas id="tmpCanvas" style="max-width: 1920px; height: 1080px;" hidden="hidden"></canvas>
+        </div>
+        <div class="subtitle-wrapper-home">
+          <ScrollSubtitle :text="spokenText" v-if="spokenText" @complete="spokenText = ''" />
+        </div>
+      </div>
+
+      <!-- 数字人面板折叠后的展开把手 -->
+      <button
+        v-show="avatarCollapsed"
+        class="avatar-expand-handle"
+        title="展开数字人面板"
+        @click="avatarCollapsed = false"
+      >
+        <i class="fas fa-chevron-left"></i>
+        <span class="handle-text">数字人</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import AppHeader from '../components/AppHeader.vue';
-import AppLeft from '../components/AppLeft.vue';
-import AppRight from '../components/AppRight.vue';
 import ScrollSubtitle from '../components/ScrollSubtitle.vue';
+import ChatSidebar from '../components/agent/ChatSidebar.vue';
+import MessageList from '../components/agent/MessageList.vue';
+import ChatInput from '../components/agent/ChatInput.vue';
+import { useAgentChat } from '@/composables/useAgentChat';
+import { transcribeAudio, synthesizeSpeech } from '@/services/api';
 import {
   getOrCreateSpeechConfig,
   getAvatarSynthesizer,
@@ -102,33 +153,27 @@ import {
   SpeechSDK
 } from '../services/azure-sdk';
 import { appConfig } from '../config/app-config';
-import { formatTime } from '../utils/time-utils';
-import { Message, WebSocketMessage, ParsedWebSocketMessage } from '../types';
 
-const router = useRouter();
 const userStore = useUserStore();
+const router = useRouter();
 
-const activeTab = ref<string>('chat');
-const dialogue = ref<Message[]>([]);
 const newMessage = ref<string>('');
 const showError = ref<boolean>(false);
 const errorMessage = ref<string>('');
-const isConnected = ref<boolean>(false);
-const isProcessing = ref<boolean>(false);
-const processingStatus = ref<string>('');
 const isRecording = ref<boolean>(false);
-const isCallActive = ref<boolean>(false);
-const dialogueContainer = ref<HTMLDivElement | null>(null);
-const userId = ref<string>('用户');
+const isTranscribing = ref<boolean>(false);
+const ttsEnabled = ref<boolean>(true);
+const isSpeaking = ref<boolean>(false);
+let currentAudio: HTMLAudioElement | null = null;
+const userId = ref<string>('anonymous');
+const spokenText = ref<string>('');
+const avatarSessionActive = ref<boolean>(false);
+const avatarCharacter = ref<string>('lisa');
+const avatarStyle = ref<string>('casual-sitting');
+const showConversations = ref<boolean>(false);
+const avatarCollapsed = ref<boolean>(false);
 
-// 侧边面板折叠状态
-const leftPanelCollapsed = ref(false);
-const rightPanelCollapsed = ref(false);
-
-const handleLogout = async () => {
-  await userStore.logoutUser();
-  router.push('/login');
-};
+const displayName = computed(() => userStore.userInfo?.nickname || '访客用户');
 
 const currentVoiceIndex = ref<number>(0);
 const currentVoice = appConfig.availableVoices[currentVoiceIndex.value];
@@ -136,95 +181,158 @@ const region = appConfig.azureRegion;
 const subscriptionKey = appConfig.azureSubscriptionKey;
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
-const spokenText = ref<string>('');
-const avatarSessionActive = ref<boolean>(false);
-const avatarCharacter = ref<string>('lisa');
-const avatarStyle = ref<string>('casual-sitting');
-const socket = ref<WebSocket | null>(null);
-const socketConnected = ref<boolean>(false);
-const websocketMessages = ref<WebSocketMessage[]>([]);
-const connectionStatus = ref<'connected' | 'disconnected' | 'connecting'>('disconnected');
-const connectionStatusText = ref('未连接');
 
-const connectWebSocket = () => {
-  if (socket.value && socket.value.readyState === WebSocket.OPEN) return;
-  const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-  const wsUrl = `${protocol}${window.location.host}/ws?user_id=${userId.value}`;
+const pickMimeType = (): string => {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+  for (const type of candidates) {
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+  return '';
+};
+
+const transcribeRecording = async (blob: Blob) => {
+  if (blob.size === 0) return;
+  isTranscribing.value = true;
   try {
-    socket.value = new WebSocket(wsUrl);
-    socket.value.onopen = () => {
-      socketConnected.value = true;
-      connectionStatus.value = 'connected';
-      connectionStatusText.value = '已连接到 WebSocket 服务器';
-      websocketMessages.value.push({ type: 'info', data: 'WebSocket 连接已建立', timestamp: new Date().getTime() });
-    };
-    socket.value.onmessage = (event) => {
-      let parsedData: ParsedWebSocketMessage;
-      try {
-        parsedData = JSON.parse(event.data as string);
-        if (!Object.prototype.hasOwnProperty.call(parsedData, 'timestamp')) parsedData.timestamp = Date.now();
-      } catch {
-        parsedData = { text: event.data as string, timestamp: Date.now() };
-      }
-      const assistantMessage = {
-        role: 'assistant',
-        content: parsedData.text || event.data,
-        timestamp: parsedData.timestamp || Date.now()
+    const response = await transcribeAudio(blob);
+    const text = response.data?.text?.trim();
+    if (text) {
+      // 转写完成自动发送，无需人工点击
+      newMessage.value = text;
+      sendMessage();
+    } else {
+      showError.value = true;
+      errorMessage.value = '未识别到语音内容，请重试';
+    }
+  } catch (err: any) {
+    showError.value = true;
+    errorMessage.value = `语音转写失败: ${err?.response?.data?.detail || err.message || '未知错误'}`;
+  } finally {
+    isTranscribing.value = false;
+  }
+};
+
+const toggleRecording = async () => {
+  if (isTranscribing.value) return;
+  if (isRecording.value) {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const mimeType = pickMimeType();
+      mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      audioChunks = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
       };
-      dialogue.value.push(assistantMessage);
-      if (assistantMessage.content) {
-        spokenText.value = assistantMessage.content;
-        speakWithAvatar();
-      }
-      isProcessing.value = false;
-      processingStatus.value = '';
-      setTimeout(() => {
-        if (dialogueContainer.value) dialogueContainer.value.scrollTop = dialogueContainer.value.scrollHeight;
-      }, 100);
-      websocketMessages.value.push({
-        type: 'received',
-        data: typeof event.data === 'string' ? event.data : JSON.stringify(event.data),
-        timestamp: new Date().getTime()
-      });
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        isRecording.value = false;
+        const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || 'audio/webm' });
+        audioChunks = [];
+        transcribeRecording(blob);
+      };
+      mediaRecorder.start();
+      isRecording.value = true;
+    } catch (error: any) {
+      showError.value = true;
+      errorMessage.value = `无法访问麦克风: ${error.message || '未知错误'}`;
+    }
+  }
+};
+
+const {
+  dialogue,
+  conversations,
+  currentConversationId,
+  isConnected,
+  isProcessing,
+  processingStatus,
+  connect,
+  sendMessage: sendChatMessage,
+  stopGeneration,
+  refreshConversations,
+  selectConversation,
+  newConversation,
+  removeConversation
+} = useAgentChat({
+  userId,
+  onReplyComplete: (content) => {
+    spokenText.value = content;
+    if (avatarEnabled && avatarSessionActive.value) {
+      speakWithAvatar();
+    } else if (ttsEnabled.value) {
+      playTts(content);
+    }
+  }
+});
+
+const playTts = async (text: string) => {
+  const clean = text.trim();
+  if (!clean) return;
+  try {
+    isSpeaking.value = true;
+    const response = await synthesizeSpeech(clean.slice(0, 500));
+    const contentType = response.headers?.['content-type'] || 'audio/mpeg';
+    const blob = new Blob([response.data], { type: contentType });
+    const url = URL.createObjectURL(blob);
+    stopAudio();
+    currentAudio = new Audio(url);
+    currentAudio.onended = () => {
+      isSpeaking.value = false;
+      URL.revokeObjectURL(url);
     };
-    socket.value.onclose = () => {
-      socketConnected.value = false;
-      connectionStatus.value = 'disconnected';
-      connectionStatusText.value = 'WebSocket 已断开';
-      websocketMessages.value.push({ type: 'info', data: 'WebSocket 连接已断开', timestamp: new Date().getTime() });
+    currentAudio.onerror = () => {
+      isSpeaking.value = false;
+      URL.revokeObjectURL(url);
     };
-    socket.value.onerror = () => {
-      connectionStatus.value = 'disconnected';
-      connectionStatusText.value = 'WebSocket 连接错误';
-      websocketMessages.value.push({ type: 'error', data: 'WebSocket 连接发生错误', timestamp: new Date().getTime() });
-    };
+    await currentAudio.play();
   } catch (err) {
-    console.error('创建 WebSocket 连接失败:', err);
-    connectionStatus.value = 'disconnected';
-    connectionStatusText.value = 'WebSocket 连接失败';
+    isSpeaking.value = false;
+    console.error('语音合成播放失败:', err);
+  }
+};
+
+const stopAudio = () => {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+};
+
+const toggleTts = () => {
+  ttsEnabled.value = !ttsEnabled.value;
+  if (!ttsEnabled.value) {
+    stopAudio();
+    isSpeaking.value = false;
   }
 };
 
 const hideError = () => { showError.value = false; };
 
+const goSettings = () => { router.push('/personal-center'); };
+
+const goHome = () => { router.push('/'); };
+
+const restartAvatar = () => {
+  avatarSessionActive.value = false;
+  setAvatarSessionInitialized(false);
+  startAvatarSession();
+};
+
 const sendMessage = () => {
-  if (!newMessage.value.trim()) return;
-  if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+  const text = newMessage.value;
+  if (!text.trim()) return;
+  if (!sendChatMessage(text)) {
     showError.value = true;
     errorMessage.value = 'WebSocket未连接，请先连接服务器';
     return;
   }
-  const userMessage = { role: 'user', content: newMessage.value, timestamp: Date.now() };
-  dialogue.value.push(userMessage);
-  isProcessing.value = true;
-  processingStatus.value = 'AI正在思考中...';
-  const wsMessage = JSON.stringify({ type: 'chat_message', message: newMessage.value, timestamp: Date.now() });
-  socket.value.send(wsMessage);
-  websocketMessages.value.push({ type: 'sent', data: wsMessage, timestamp: Date.now() });
   newMessage.value = '';
-  setTimeout(() => {
-    if (dialogueContainer.value) dialogueContainer.value.scrollTop = dialogueContainer.value.scrollHeight;
-  }, 100);
 };
 
 const fetchIceServerInfo = async (key: string, reg: string) => {
@@ -270,23 +378,18 @@ const setupWebRTC = (iceServerUrl: string, iceServerUsername: string, iceServerC
       audioElement.srcObject = event.streams[0];
       audioElement.autoplay = true;
       audioElement.muted = true;
+      document.body.appendChild(audioElement);
     }
   };
   newPeerConnection.oniceconnectionstatechange = function () {
     if (newPeerConnection.iceConnectionState === 'connected') {
       avatarSessionActive.value = true;
-      connectionStatus.value = 'connected';
-      connectionStatusText.value = '数字人连接已建立';
     } else if (newPeerConnection.iceConnectionState === 'failed') {
       avatarSessionActive.value = false;
-      connectionStatus.value = 'disconnected';
-      connectionStatusText.value = '数字人连接失败';
       showError.value = true;
       errorMessage.value = '数字人连接失败，请检查网络连接和配置';
     } else if (newPeerConnection.iceConnectionState === 'disconnected' || newPeerConnection.iceConnectionState === 'closed') {
       avatarSessionActive.value = false;
-      connectionStatus.value = 'disconnected';
-      connectionStatusText.value = '数字人连接已断开';
     }
   };
   try {
@@ -298,14 +401,13 @@ const setupWebRTC = (iceServerUrl: string, iceServerUsername: string, iceServerC
   }
 };
 
+// 未配置 Azure 订阅密钥时静默禁用数字人功能，聊天不受影响
+const avatarEnabled = Boolean(subscriptionKey);
+
 const startAvatarSession = async () => {
+  if (!avatarEnabled) return;
   if (isAvatarSessionInitialized() && avatarSessionActive.value) return;
   try {
-    if (!subscriptionKey) {
-      showError.value = true;
-      errorMessage.value = '缺少Azure订阅密钥，请配置VITE_AZURE_SUBSCRIPTION_KEY环境变量。';
-      return;
-    }
     const speechConfig = getOrCreateSpeechConfig(subscriptionKey, region, currentVoice);
     const videoFormat = new SpeechSDK.AvatarVideoFormat();
     const avatarConfiguration: any = new SpeechSDK.AvatarConfig(avatarCharacter.value, avatarStyle.value, videoFormat);
@@ -337,6 +439,7 @@ const startAvatarSession = async () => {
 };
 
 const speakWithAvatar = async () => {
+  if (!avatarEnabled) return;
   if (!avatarSessionActive.value) await startAvatarSession();
   const currentAvatarSynthesizer = getAvatarSynthesizer();
   if (!currentAvatarSynthesizer) {
@@ -344,10 +447,10 @@ const speakWithAvatar = async () => {
     errorMessage.value = '虚拟形象合成器未初始化。请尝试重新启动。';
     return;
   }
-  
+
   try {
-    const text = spokenText.value;  
-    
+    const text = spokenText.value;
+
     currentAvatarSynthesizer.speakTextAsync(text).then(
       (result: any) => {
         if (result.reason === SpeechSDK.ResultReason.Canceled) {
@@ -368,30 +471,6 @@ const speakWithAvatar = async () => {
   }
 };
 
-const toggleRecording = async () => {
-  if (isRecording.value) {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-      isRecording.value = false;
-    }
-  } else {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
-      mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
-      mediaRecorder.onstop = () => stream.getTracks().forEach(track => track.stop());
-      mediaRecorder.start();
-      isRecording.value = true;
-    } catch (error: any) {
-      showError.value = true;
-      errorMessage.value = `无法访问麦克风: ${error.message || '未知错误'}`;
-    }
-  }
-};
-
-const startVideoCall = () => { isCallActive.value = !isCallActive.value; };
-
 onMounted(async () => {
   // 初始化用户状态
   userStore.initFromStorage();
@@ -399,7 +478,8 @@ onMounted(async () => {
     userId.value = localStorage.getItem('user_code') || userStore.userInfo.user_id;
   }
 
-  connectWebSocket();
+  connect();
+  refreshConversations();
   setTimeout(async () => { await startAvatarSession(); }, 1000);
   document.addEventListener('visibilitychange', async () => {
     if (!document.hidden && !avatarSessionActive.value) await startAvatarSession();
@@ -408,7 +488,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-  if (socket.value) socket.value.close();
+  stopAudio();
   const currentAvatarSynthesizer = getAvatarSynthesizer();
   if (currentAvatarSynthesizer) {
     currentAvatarSynthesizer.close();
@@ -423,19 +503,14 @@ onUnmounted(() => {
 /* 设计变量：仅本页使用，避免与全局冲突 */
 .home-layout {
   --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
+  --color-primary-deep: #1e3a8a;
   --color-surface: #ffffff;
-  --color-bg: #f8fafc;
-  --color-bg-chat: #f1f5f9;
+  --color-bg: #f1f5f9;
   --color-border: #e2e8f0;
   --color-text: #1e293b;
   --color-text-muted: #64748b;
   --color-danger: #dc2626;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
   --radius-full: 9999px;
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
   --shadow-lg: 0 10px 40px rgba(0,0,0,0.1);
   --transition: 0.2s ease;
 }
@@ -447,14 +522,6 @@ onUnmounted(() => {
   font-family: "Noto Sans SC", "Helvetica Neue", Arial, sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
-}
-
-.home-layout .connection-status {
-  padding: 0.5rem 1rem;
-  text-align: center;
-  font-size: 0.875rem;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
 }
 
 .home-layout .main-container {
@@ -469,32 +536,231 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
-/* 中间内容区 - 左右结构 */
-.home-layout .center-content {
-  flex: 1;
+/* ===== 最左图标功能栏 ===== */
+.home-layout .icon-rail {
   display: flex;
-  flex-direction: row;
-  gap: 1rem;
-  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 64px;
+  min-width: 64px;
+  padding: 14px 0;
+  background: linear-gradient(180deg, #172554 0%, #1e3a8a 100%);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.home-layout .rail-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.5);
   overflow: hidden;
 }
 
-.home-layout .avatar-panel {
-  flex: 1;
-  background: #0f172a;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  min-width: 400px;
+.home-layout .rail-logo-img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.home-layout .rail-actions {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-layout .rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.home-layout .rail-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.home-layout .rail-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.45);
+}
+
+.home-layout .rail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-layout .rail-avatar {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-color: transparent;
+}
+
+/* ===== 历史会话面板 ===== */
+.home-layout .conv-panel {
+  height: 100%;
+}
+
+/* ===== 最右：数字人面板（可折叠） ===== */
+.home-layout .avatar-panel {
+  flex: 1.1;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  max-width: 460px;
+  background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 55%, #1d4ed8 100%);
+  border-radius: 16px;
+  overflow: hidden;
   position: relative;
   box-shadow: var(--shadow-lg);
+}
+
+.home-layout .avatar-panel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.home-layout .avatar-panel-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* 折叠后的展开把手（贴右缘竖条） */
+.home-layout .avatar-expand-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 44px;
+  padding: 16px 0;
+  color: rgba(255, 255, 255, 0.85);
+  background: linear-gradient(180deg, #172554 0%, #1e3a8a 100%);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  transition: background var(--transition);
+}
+
+.home-layout .avatar-expand-handle:hover {
+  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
+}
+
+.home-layout .handle-text {
+  writing-mode: vertical-rl;
+  letter-spacing: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.home-layout .avatar-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.home-layout .avatar-user-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  font-size: 16px;
+  color: #1e3a8a;
+  background: #e0e7ff;
+  border: 2px solid rgba(255, 255, 255, 0.65);
+  border-radius: 50%;
+}
+
+.home-layout .avatar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-layout .avatar-user-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-layout .avatar-user-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.home-layout .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.home-layout .status-dot.on {
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.9);
+}
+
+.home-layout .status-dot.off {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.home-layout .conn-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.home-layout .conn-dot.online {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.9);
+}
+
+.home-layout .conn-dot.offline {
+  background: #f87171;
 }
 
 .home-layout #video-container {
   flex: 1;
   width: 100%;
-  height: calc(100% - 80px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -507,7 +773,6 @@ onUnmounted(() => {
   height: 100%;
   object-fit: contain;
   display: block;
-  background: #0f172a;
 }
 
 /* 字幕容器定位 */
@@ -527,267 +792,97 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-@keyframes char-appear {
-  0% {
-    opacity: 0;
-    transform: translateX(15px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
+/* ===== 中间：智能体对话（主区，内容居中） ===== */
 .home-layout .chat-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
+  background: #1e293b;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow: var(--shadow-lg);
-  min-width: 350px;
-  border: 1px solid var(--color-border);
+  min-width: 420px;
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.home-layout .tabs {
-  display: flex;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-
-.home-layout .tab-button {
-  padding: 12px 20px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  border-bottom: 3px solid transparent;
-  transition: color var(--transition), border-color var(--transition), background var(--transition);
-}
-
-.home-layout .tab-button.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.home-layout .tab-content,
-.home-layout .tab-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.home-layout .dialogue-container {
-  flex: 1;
-  padding: 1rem 1.25rem;
-  overflow-y: auto;
-  background: var(--color-bg-chat);
-}
-
-.home-layout .dialogue-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.home-layout .dialogue-container::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: var(--radius-full);
-}
-
-.home-layout .message {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  max-width: 82%;
-  animation: fadeIn 0.25s ease;
-  line-height: 1.5;
-}
-
-.home-layout .message.welcome-msg {
-  border-left: 4px solid var(--color-primary);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.home-layout .message.role-user {
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  color: white;
-  margin-left: auto;
-  text-align: right;
-}
-
-.home-layout .message.role-assistant {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.home-layout .message.role-system {
-  background: var(--color-bg);
-  color: var(--color-text-muted);
-  font-style: italic;
-  border: 1px dashed var(--color-border);
-}
-
-.home-layout .message-content {
-  margin-bottom: 0.25rem;
-  font-size: 0.9375rem;
-}
-
-.home-layout .timestamp {
-  font-size: 0.6875rem;
-  color: var(--color-text-muted);
-  text-align: right;
-  opacity: 0.85;
-}
-
-.home-layout .processing-content {
+.home-layout .chat-title-bar {
   display: flex;
   align-items: center;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.home-layout .dots {
+.home-layout .tts-toggle {
   display: flex;
-  margin-right: 0.5rem;
-  gap: 4px;
-}
-
-.home-layout .dots span {
-  width: 6px;
-  height: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
-  background: var(--color-primary);
-  animation: bounce 1.5s infinite;
+  cursor: pointer;
+  transition: all var(--transition);
 }
 
-.home-layout .dots span:nth-child(2) { animation-delay: 0.2s; }
-.home-layout .dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+.home-layout .tts-toggle.active {
+  color: #4ade80;
 }
 
-.home-layout .input-area {
-  padding: 1rem 1.25rem;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+.home-layout .tts-toggle.speaking {
+  animation: tts-pulse 1s infinite;
+}
+
+@keyframes tts-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); }
+}
+
+.home-layout .chat-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.home-layout .text-input {
-  flex: 1;
-  padding: 0.75rem 1.125rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  gap: 8px;
   font-size: 0.9375rem;
-  font-family: inherit;
-  outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-.home-layout .text-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-.home-layout .send-btn,
-.home-layout .record-btn,
-.home-layout .video-call-btn {
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 0.9375rem;
-  transition: transform var(--transition), background var(--transition), opacity var(--transition);
-  min-width: 44px;
-}
-
-.home-layout .send-btn {
-  background: var(--color-primary);
-  color: white;
-  font-weight: 500;
-}
-
-.home-layout .send-btn:disabled {
-  background: #cbd5e1;
-  cursor: not-allowed;
-  opacity: 0.8;
-}
-
-.home-layout .record-btn {
-  background: var(--color-text-muted);
-  color: white;
-}
-
-.home-layout .record-btn.recording {
-  background: var(--color-danger);
-  animation: pulse 1.5s infinite;
-}
-
-.home-layout .video-call-btn {
-  background: #059669;
-  color: white;
-}
-
-.home-layout .video-call-btn:disabled {
-  background: #cbd5e1;
-  cursor: not-allowed;
-  opacity: 0.8;
-}
-
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .home-layout .error-message {
-  background: #fef2f2;
-  color: #991b1b;
-  padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
-  margin-bottom: 1rem;
-  border: 1px solid #fecaca;
+  margin: 10px 14px 0;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  padding: 0.625rem 0.875rem;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
 }
 
-@media (max-width: 900px) {
-  .home-layout .main-container {
-    flex-direction: column;
-    padding: 0.75rem;
+@media (max-width: 1100px) {
+  .home-layout .avatar-panel,
+  .home-layout .avatar-expand-handle {
+    display: none;
   }
-  .home-layout .center-content {
-    flex-direction: column;
+}
+
+@media (max-width: 760px) {
+  .home-layout .conv-panel {
+    display: none;
   }
-  .home-layout .avatar-panel {
-    min-height: 280px;
-    min-width: 100%;
+  .home-layout .icon-rail {
+    width: 52px;
+    min-width: 52px;
   }
   .home-layout .chat-container {
-    min-height: 360px;
-    min-width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .home-layout .message {
-    max-width: 92%;
+    min-width: 0;
   }
 }
 </style>
