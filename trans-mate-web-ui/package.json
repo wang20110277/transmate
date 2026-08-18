@@ -17,8 +17,9 @@
     "websocket-server": "node server.js",
     "dev-all": "concurrently \"npm run dev\" \"npm run websocket-server\"",
     "electron:dev": "concurrently -k \"vite\" \"wait-on http://localhost:3000 && electron .\"",
+    "sign:mac": "codesign --force --deep -s - --entitlements build/entitlements.mac.plist \"$(find out -maxdepth 2 -name '*.app' -print -quit)\"",
     "start": "electron-forge start",
-    "package": "npm run build:web && electron-forge package",
+    "package": "npm run build:web && electron-forge package && npm run sign:mac",
     "make": "npm run build:web && electron-forge make",
     "publish": "npm run build:web && dotenv -e .env -- electron-forge publish"
   },
