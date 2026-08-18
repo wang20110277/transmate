@@ -16,3 +16,6 @@ __pycache__/
 # RAG 向量库与测试产物
 trans-mate/store/
 gui-test-screenshots/
+
+# electron 打包产物
+out

@@ -39,6 +39,16 @@ header {
   z-index: 100;
 }
 
+/* macOS 无标题栏:顶栏兼作窗口拖动区,左侧为红绿灯按钮留白 */
+.platform-mac header {
+  -webkit-app-region: drag;
+  padding-left: 6rem;
+}
+
+.platform-mac .header-right {
+  -webkit-app-region: no-drag;
+}
+
 .header-content {
   display: flex;
   align-items: center;

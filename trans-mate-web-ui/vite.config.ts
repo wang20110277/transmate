@@ -4,6 +4,8 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // 相对路径：Electron 打包后以 file:// 加载 dist/index.html，绝对路径会白屏
+  base: './',
   plugins: [vue(), vueJsx()],
   server: {
     port: 3000,
