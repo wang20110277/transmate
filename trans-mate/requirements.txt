@@ -58,6 +58,9 @@ tushare==1.4.9
 #tavily
 tavily-python==0.7.23
 
+#tts
+edge-tts==7.2.8
+
 #testing
 pytest==8.3.5
 pytest-asyncio==0.25.3
