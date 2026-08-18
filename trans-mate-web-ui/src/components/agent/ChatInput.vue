@@ -13,6 +13,12 @@
         :disabled="disabled"
       />
     </div>
+    <button v-if="!isProcessing" class="action-round send" @click="$emit('send')" :disabled="disabled" title="发送">
+      <i class="fas fa-paper-plane"></i>
+    </button>
+    <button v-else class="action-round stop" @click="$emit('stop')" title="停止生成">
+      <i class="fas fa-stop"></i>
+    </button>
     <button
       :class="['action-round', 'mic', { recording: isRecording, transcribing: isTranscribing }]"
       @click="$emit('toggleRecording')"
@@ -21,12 +27,6 @@
     >
       <span v-if="isTranscribing" class="mic-spinner"></span>
       <i v-else :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
-    </button>
-    <button v-if="!isProcessing" class="action-round send" @click="$emit('send')" :disabled="disabled" title="发送">
-      <i class="fas fa-paper-plane"></i>
-    </button>
-    <button v-else class="action-round stop" @click="$emit('stop')" title="停止生成">
-      <i class="fas fa-stop"></i>
     </button>
   </div>
 </template>
