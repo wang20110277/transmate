@@ -1,9 +1,5 @@
 <template>
   <div class="message-list" ref="listContainer">
-    <div v-if="messages.length === 0" class="message role-assistant welcome-msg">
-      <div class="message-content">你好，我是阿雅，您的专属智能助手。我可以调用工具为您查询天气、搜索网络、检索知识库和查询股票行情，有什么可以帮助您？</div>
-    </div>
-
     <template v-for="(message, index) in messages" :key="index">
       <div :class="['message', 'role-' + (message.role || 'system')]">
         <!-- 工具调用块（ZCode 式折叠面板） -->
@@ -15,12 +11,38 @@
           />
         </div>
 
-        <div v-if="message.content" class="message-content">
+        <div
+          v-if="message.content"
+          :class="['message-content', { collapsed: message.role === 'assistant' && collapsedSet.has(index) }]"
+        >
           <template v-if="message.role === 'assistant'">
             <div class="markdown-body" v-html="renderMarkdown(message.content)"></div>
             <span v-if="message.streaming" class="streaming-cursor"></span>
           </template>
           <template v-else>{{ message.content }}</template>
+        </div>
+
+        <!-- AI 回复操作：朗读 / 收起 -->
+        <div
+          v-if="message.role === 'assistant' && !message.streaming && message.content"
+          class="msg-actions"
+        >
+          <button
+            :class="['msg-action-btn', { speaking: speakingIndex === index }]"
+            :disabled="ttsMuted"
+            :title="ttsMuted ? t('chat.speakMuted') : (speakingIndex === index ? t('chat.stopSpeak') : t('chat.speak'))"
+            @click="emit('toggleSpeak', index)"
+          >
+            <i :class="speakingIndex === index ? 'fas fa-stop' : 'fas fa-volume-up'"></i>
+          </button>
+          <button
+            v-if="isLongMessage(message)"
+            class="msg-action-btn collapse-btn"
+            @click="toggleCollapse(index)"
+          >
+            <span>{{ collapsedSet.has(index) ? t('chat.expand') : t('chat.collapse') }}</span>
+            <i :class="collapsedSet.has(index) ? 'fas fa-chevron-down' : 'fas fa-chevron-up'"></i>
+          </button>
         </div>
 
         <!-- 思考中状态（最后一条用户消息后） -->
@@ -32,7 +54,7 @@
             <div class="dots">
               <span></span><span></span><span></span>
             </div>
-            <span class="processing-text">{{ processingStatus || '正在思考中...' }}</span>
+            <span class="processing-text">{{ processingStatus || t('chat.thinking') }}</span>
           </div>
         </div>
 
@@ -45,7 +67,7 @@
             <div class="dots">
               <span></span><span></span><span></span>
             </div>
-            <span class="processing-text">正在执行工具...</span>
+            <span class="processing-text">{{ t('chat.runningTools') }}</span>
           </div>
         </div>
 
@@ -61,18 +83,45 @@
 import { ref, watch, nextTick, onMounted } from 'vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js/lib/common'
-import 'highlight.js/styles/github-dark.css'
+import 'highlight.js/styles/github.css'
 import ToolCallBlockView from './ToolCallBlockView.vue'
 import { formatTime } from '@/utils/time-utils'
+import { useI18n } from '@/i18n'
 import type { Message } from '@/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   messages: Message[]
   isProcessing: boolean
   processingStatus: string
+  speakingIndex: number | null
+  ttsMuted?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'toggleSpeak', index: number): void
 }>()
 
 const listContainer = ref<HTMLDivElement | null>(null)
+
+// 长回复折叠状态（按消息索引记录）
+const collapsedSet = ref(new Set<number>())
+
+const toggleCollapse = (index: number) => {
+  const next = new Set(collapsedSet.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  collapsedSet.value = next
+}
+
+const isLongMessage = (message: Message) => {
+  const content = message.content || ''
+  return content.length > 280 || content.split('\n').length > 8
+}
 
 const md = new MarkdownIt({
   breaks: true,
@@ -103,7 +152,11 @@ const hasRunningTools = (message: Message): boolean => {
 
 const scrollToBottom = () => {
   nextTick(() => {
-    if (listContainer.value) listContainer.value.scrollTop = listContainer.value.scrollHeight
+    // 滚动容器是父级 .main-body，本组件只占位居中列
+    const el = listContainer.value
+    if (!el) return
+    const scroller = el.closest('.main-body') as HTMLElement | null
+    if (scroller) scroller.scrollTop = scroller.scrollHeight
   })
 }
 
@@ -117,23 +170,22 @@ onMounted(scrollToBottom)
 </script>
 
 <style scoped>
+/* 滚动由父容器 .main-body 完成，这里只负责居中列布局 */
 .message-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.welcome-msg .message-content {
-  background: rgba(255, 255, 255, 0.06);
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 16px 24px 8px;
+  box-sizing: border-box;
 }
 
 .message {
   display: flex;
   flex-direction: column;
-  max-width: 92%;
+  max-width: 88%;
 }
 
 .role-user {
@@ -162,21 +214,68 @@ onMounted(scrollToBottom)
 }
 
 .role-assistant .message-content {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+  background: var(--color-fill);
+  color: var(--color-text);
   border-bottom-left-radius: 4px;
 }
 
 .role-system .message-content {
-  background: rgba(245, 108, 108, 0.15);
-  color: #f89898;
+  background: var(--color-danger-soft);
+  color: var(--color-danger-deep);
   font-size: 13px;
 }
 
 .timestamp {
   margin-top: 4px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--color-text-faint);
+}
+
+/* AI 回复操作行：朗读 / 收起 */
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.msg-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.msg-action-btn:hover {
+  color: var(--color-text);
+  background: var(--color-fill);
+}
+
+/* 全局静音时朗读按钮禁用置灰 */
+.msg-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.msg-action-btn.speaking {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+/* 折叠态：内容截断并底部渐隐 */
+.message-content.collapsed .markdown-body {
+  max-height: 108px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
 }
 
 /* markdown 渲染样式 */
@@ -201,7 +300,8 @@ onMounted(scrollToBottom)
 .markdown-body :deep(code) {
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--color-fill-strong);
+  color: var(--color-text);
   font-size: 13px;
   font-family: 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -209,9 +309,10 @@ onMounted(scrollToBottom)
 .markdown-body :deep(pre) {
   margin: 8px 0;
   padding: 10px 12px;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow-x: auto;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-soft-bg);
 }
 
 .markdown-body :deep(pre code) {
@@ -227,19 +328,23 @@ onMounted(scrollToBottom)
 
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--color-border);
   padding: 5px 10px;
 }
 
+.markdown-body :deep(th) {
+  background: var(--color-soft-bg);
+}
+
 .markdown-body :deep(a) {
-  color: #79bbff;
+  color: var(--color-primary);
 }
 
 .markdown-body :deep(blockquote) {
   margin: 8px 0;
   padding: 4px 12px;
-  border-left: 3px solid rgba(64, 158, 255, 0.5);
-  color: rgba(255, 255, 255, 0.65);
+  border-left: 3px solid rgba(37, 99, 235, 0.45);
+  color: var(--color-text-muted);
 }
 
 /* 流式光标 */
@@ -249,7 +354,7 @@ onMounted(scrollToBottom)
   height: 16px;
   margin-left: 2px;
   vertical-align: -2px;
-  background: #409eff;
+  background: #2563eb;
   border-radius: 1px;
   animation: cursor-blink 0.9s steps(2) infinite;
 }
@@ -280,7 +385,7 @@ onMounted(scrollToBottom)
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #409eff;
+  background: #2563eb;
   animation: dot-bounce 1.2s infinite ease-in-out;
 }
 
@@ -299,6 +404,6 @@ onMounted(scrollToBottom)
 
 .processing-text {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--color-text-muted);
 }
 </style>

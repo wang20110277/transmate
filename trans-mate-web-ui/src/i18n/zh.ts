@@ -1,0 +1,83 @@
+// 中文词典（界面文案按模块分组，与 en.ts 结构保持一致）
+export const zh = {
+  home: {
+    newChat: '新对话',
+    recent: '最近',
+    expandSidebar: '展开侧栏',
+    collapseSidebar: '收起侧栏',
+    connected: '已连接',
+    connecting: '连接中…',
+    ttsEnable: '开启语音播报',
+    ttsDisable: '关闭语音播报',
+    ttsLabel: '语音播报',
+    ttsSpeaking: '播报中',
+    ttsMuted: '已静音',
+    greeting: '有什么我能帮你的吗？',
+    recommend: '为你推荐',
+    inputPlaceholder: '发消息，或点击麦克风说话…',
+    suggestions: [
+      '把「会议将于明天下午三点开始」翻译成英文',
+      '查一下今天北京的天气',
+      '搜索最近一周 AI 领域的重要新闻',
+      '查询贵州茅台最新的股票行情'
+    ],
+    prefTitle: '偏好设置',
+    prefButton: '界面偏好',
+    settings: '设置',
+    openSettings: '打开设置',
+    langLabel: '界面语言',
+    themeLabel: '界面主题',
+    themeLight: '浅色',
+    themeDark: '深色',
+    connLabel: '连接设置',
+    apply: '应用',
+    connHint: '修改服务地址后自动重载页面'
+  },
+  errors: {
+    noSpeech: '未识别到语音内容，请重试',
+    transcribeFailed: '语音转写失败: {msg}',
+    micDenied: '无法访问麦克风: {msg}',
+    unknown: '未知错误',
+    invalidUrl: '服务地址需以 http:// 或 https:// 开头',
+    wsNotConnected: 'WebSocket未连接，请先连接服务器'
+  },
+  settings: {
+    backHome: '返回主页',
+    groupBasic: '基础设置',
+    groupCapability: '能力设置',
+    notOpen: '暂未开放',
+    items: {
+      general: { label: '常规', desc: '通用偏好与基础行为配置，如默认选项、数据管理等。' },
+      appearance: { label: '外观', desc: '主题与显示相关配置，如界面主题、字体大小等。' },
+      memory: { label: '记忆', desc: '对话记忆与长期偏好，让助手记住重要信息。' },
+      skills: { label: '技能', desc: '查看与管理助手可用的技能与插件。' },
+      rag: { label: 'RAG', desc: '知识库检索增强，上传文档以获得更准确的回答。' },
+      mcp: { label: 'MCP', desc: 'Model Context Protocol 服务接入与配置。' }
+    }
+  },
+  chat: {
+    emptyConversations: '暂无历史会话，点击「新对话」开始',
+    untitled: '新会话',
+    deleteConversation: '删除会话',
+    listening: '正在聆听，点击麦克风结束',
+    transcribing: '正在转写…',
+    micTranscribing: '语音转写中…',
+    micStop: '停止录音并转写',
+    micTitle: '语音输入',
+    send: '发送',
+    stopGenerate: '停止生成',
+    speak: '朗读本条回复',
+    stopSpeak: '停止朗读',
+    speakMuted: '已全局静音',
+    expand: '展开',
+    collapse: '收起',
+    thinking: '正在思考中...',
+    runningTools: '正在执行工具...',
+    agentWorking: '智能体 {agent} 正在工作...',
+    toolRunning: '运行中',
+    toolDone: '完成',
+    toolArgs: '参数',
+    toolResult: '结果',
+    toolWaiting: '正在等待工具执行...'
+  }
+}

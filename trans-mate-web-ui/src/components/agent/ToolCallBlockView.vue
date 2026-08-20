@@ -6,24 +6,24 @@
       <span class="tool-name">{{ tool.name }}</span>
       <span v-if="tool.running" class="tool-status running-status">
         <span class="mini-spinner"></span>
-        运行中
+        {{ t('chat.toolRunning') }}
       </span>
       <span v-else class="tool-status done-status">
         <i class="fas fa-check"></i>
-        完成
+        {{ t('chat.toolDone') }}
       </span>
     </div>
     <div v-if="expanded" class="tool-body">
       <div v-if="argsText" class="tool-section">
-        <div class="section-label">参数</div>
+        <div class="section-label">{{ t('chat.toolArgs') }}</div>
         <pre class="section-content">{{ argsText }}</pre>
       </div>
       <div v-if="tool.result" class="tool-section">
-        <div class="section-label">结果</div>
+        <div class="section-label">{{ t('chat.toolResult') }}</div>
         <pre class="section-content">{{ tool.result }}</pre>
       </div>
       <div v-if="!argsText && !tool.result && tool.running" class="tool-section">
-        <div class="section-label">正在等待工具执行...</div>
+        <div class="section-label">{{ t('chat.toolWaiting') }}</div>
       </div>
     </div>
   </div>
@@ -31,7 +31,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from '@/i18n'
 import type { ToolCallBlock } from '@/types'
+
+const { t } = useI18n()
 
 const props = defineProps<{ tool: ToolCallBlock }>()
 
@@ -53,14 +56,14 @@ const argsText = computed(() => {
 .tool-block {
   width: 100%;
   margin-bottom: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-soft-bg);
   overflow: hidden;
 }
 
 .tool-block.running {
-  border-color: rgba(64, 158, 255, 0.5);
+  border-color: rgba(37, 99, 235, 0.45);
 }
 
 .tool-header {
@@ -74,12 +77,12 @@ const argsText = computed(() => {
 }
 
 .tool-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-hover);
 }
 
 .chevron {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--color-text-muted);
 }
 
 .tool-icon {
@@ -91,7 +94,7 @@ const argsText = computed(() => {
   flex: 1;
   font-size: 13px;
   font-family: 'SF Mono', Menlo, Consolas, monospace;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--color-text);
 }
 
 .tool-status {
@@ -102,19 +105,19 @@ const argsText = computed(() => {
 }
 
 .done-status {
-  color: #67c23a;
+  color: var(--color-success);
 }
 
 .running-status {
-  color: #409eff;
+  color: var(--color-primary);
 }
 
 .mini-spinner {
   display: inline-block;
   width: 10px;
   height: 10px;
-  border: 2px solid rgba(64, 158, 255, 0.3);
-  border-top-color: #409eff;
+  border: 2px solid rgba(37, 99, 235, 0.25);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -125,7 +128,7 @@ const argsText = computed(() => {
 
 .tool-body {
   padding: 8px 12px 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--color-border);
 }
 
 .tool-section {
@@ -138,7 +141,7 @@ const argsText = computed(() => {
 
 .section-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--color-text-muted);
   margin-bottom: 4px;
 }
 
@@ -147,9 +150,10 @@ const argsText = computed(() => {
   padding: 8px 10px;
   max-height: 220px;
   overflow: auto;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
-  color: rgba(255, 255, 255, 0.8);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-family: 'SF Mono', Menlo, Consolas, monospace;
   white-space: pre-wrap;

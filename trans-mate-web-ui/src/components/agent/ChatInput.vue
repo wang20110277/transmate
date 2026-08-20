@@ -1,163 +1,271 @@
 <template>
-  <div class="chat-input">
-    <div class="input-pill">
-      <i class="fas fa-comment-dots input-icon"></i>
-      <input
-        type="text"
-        class="text-input"
-        :value="modelValue"
-        placeholder="请输入您的问题..."
-        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-        @keyup.enter="$emit('send')"
-        autocomplete="off"
-        :disabled="disabled"
-      />
+  <div :class="['chat-input-card', { recording: isRecording }]">
+    <div v-if="isRecording || isTranscribing" class="voice-state">
+      <template v-if="isRecording">
+        <span class="waveform" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </span>
+        <span class="voice-text">{{ t('chat.listening') }}</span>
+      </template>
+      <template v-else>
+        <span class="mini-spinner"></span>
+        <span class="voice-text">{{ t('chat.transcribing') }}</span>
+      </template>
     </div>
-    <button v-if="!isProcessing" class="action-round send" @click="$emit('send')" :disabled="disabled" title="发送">
-      <i class="fas fa-paper-plane"></i>
-    </button>
-    <button v-else class="action-round stop" @click="$emit('stop')" title="停止生成">
-      <i class="fas fa-stop"></i>
-    </button>
-    <button
-      :class="['action-round', 'mic', { recording: isRecording, transcribing: isTranscribing }]"
-      @click="$emit('toggleRecording')"
+
+    <textarea
+      v-show="!isRecording && !isTranscribing"
+      ref="textareaRef"
+      class="text-input"
+      rows="1"
+      :value="modelValue"
+      :placeholder="placeholder"
       :disabled="disabled"
-      :title="isTranscribing ? '语音转写中...' : (isRecording ? '停止录音并转写' : '语音输入')"
-    >
-      <span v-if="isTranscribing" class="mic-spinner"></span>
-      <i v-else :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
-    </button>
+      autocomplete="off"
+      @input="onInput"
+      @keydown.enter.exact.prevent="$emit('send')"
+    ></textarea>
+
+    <div class="action-row">
+      <button
+        :class="['action-btn', 'mic', { recording: isRecording, transcribing: isTranscribing }]"
+        :disabled="disabled"
+        :title="micTitle"
+        @click="$emit('toggleRecording')"
+      >
+        <span v-if="isTranscribing" class="mini-spinner"></span>
+        <i v-else :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
+      </button>
+
+      <button
+        v-if="!isProcessing"
+        class="action-btn send"
+        :disabled="disabled || !modelValue.trim()"
+        :title="t('chat.send')"
+        @click="$emit('send')"
+      >
+        <i class="fas fa-arrow-up"></i>
+      </button>
+      <button v-else class="action-btn stop" :title="t('chat.stopGenerate')" @click="$emit('stop')">
+        <i class="fas fa-stop"></i>
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { ref, watch, nextTick, onMounted, computed } from 'vue'
+import { useI18n } from '@/i18n'
+
+const { t } = useI18n()
+
+const props = defineProps<{
   modelValue: string
   isProcessing: boolean
   isRecording: boolean
   isTranscribing?: boolean
   disabled: boolean
+  placeholder?: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'send'): void
   (e: 'stop'): void
   (e: 'toggleRecording'): void
 }>()
+
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+const micTitle = computed(() => {
+  if (props.isTranscribing) return t('chat.micTranscribing')
+  return props.isRecording ? t('chat.micStop') : t('chat.micTitle')
+})
+
+// 自动增高，最高 160px 后内部滚动
+const adjustHeight = () => {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+}
+
+const onInput = (event: Event) => {
+  emit('update:modelValue', (event.target as HTMLTextAreaElement).value)
+  nextTick(adjustHeight)
+}
+
+watch(() => props.modelValue, () => nextTick(adjustHeight))
+onMounted(adjustHeight)
 </script>
 
 <style scoped>
-.chat-input {
+.chat-input-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  padding: 12px 14px 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-input-card:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.1);
+}
+
+.chat-input-card.recording {
+  border-color: var(--color-danger);
+  box-shadow: 0 4px 16px rgba(245, 63, 63, 0.1);
+}
+
+/* 录音/转写状态条 */
+.voice-state {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 14px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 44px;
 }
 
-.input-pill {
-  flex: 1;
+.voice-text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.waveform {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  transition: border-color 0.2s;
+  gap: 3px;
+  height: 18px;
 }
 
-.input-pill:focus-within {
-  border-color: #3b82f6;
+.waveform i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-danger);
+  animation: wave 1s ease-in-out infinite;
 }
 
-.input-icon {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+.waveform i:nth-child(1) { animation-delay: 0s; }
+.waveform i:nth-child(2) { animation-delay: 0.15s; }
+.waveform i:nth-child(3) { animation-delay: 0.3s; }
+.waveform i:nth-child(4) { animation-delay: 0.15s; }
+.waveform i:nth-child(5) { animation-delay: 0s; }
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
 }
 
 .text-input {
-  flex: 1;
-  padding: 11px 0;
+  width: 100%;
+  padding: 0 2px;
   font-size: 14px;
-  color: #fff;
+  font-family: inherit;
+  line-height: 1.6;
+  color: var(--color-text);
   background: transparent;
   border: none;
   outline: none;
+  resize: none;
+  max-height: 160px;
+  box-sizing: border-box;
 }
 
 .text-input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-faint);
 }
 
 .text-input:disabled {
   opacity: 0.6;
 }
 
-.action-round {
+/* 底部操作行 */
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  font-size: 15px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  border: none;
+  border-radius: 10px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 0.15s, opacity 0.2s;
+  transition: all 0.2s;
 }
 
-.action-round:hover:not(:disabled) {
-  transform: scale(1.06);
+.action-btn:hover:not(:disabled) {
+  background: var(--color-border);
 }
 
-.action-round:disabled {
-  opacity: 0.5;
+.action-btn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.action-round.send {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
-  border: none;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+.action-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
-.action-round.stop {
-  background: linear-gradient(135deg, #dc2626, #ef4444);
-  border: none;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+.action-btn.send {
+  color: #ffffff;
+  background: var(--color-primary);
 }
 
-.action-round.mic {
-  font-size: 17px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+.action-btn.send:hover:not(:disabled) {
+  background: var(--color-primary-deep);
 }
 
-.action-round.mic.recording {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.15);
-  border-color: #ef4444;
+.action-btn.stop {
+  color: #ffffff;
+  background: var(--color-danger);
+}
+
+.action-btn.stop:hover {
+  background: var(--color-danger-deep);
+}
+
+.action-btn.mic {
+  font-size: 15px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.action-btn.mic:hover:not(:disabled) {
+  background: var(--color-primary-soft-strong);
+}
+
+.action-btn.mic.recording {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
   animation: mic-pulse 1.2s infinite;
 }
 
-.action-round.mic.transcribing {
-  color: #60a5fa;
-  border-color: #60a5fa;
+.action-btn.mic.transcribing {
+  color: var(--color-primary);
 }
 
-.mic-spinner {
+.mini-spinner {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(96, 165, 250, 0.3);
-  border-top-color: #60a5fa;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(37, 99, 235, 0.25);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: mic-spin 0.8s linear infinite;
 }
@@ -167,7 +275,15 @@ defineEmits<{
 }
 
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
-  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 63, 63, 0.3); }
+  50% { box-shadow: 0 0 0 7px rgba(245, 63, 63, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waveform i,
+  .action-btn.mic.recording,
+  .mini-spinner {
+    animation: none;
+  }
 }
 </style>

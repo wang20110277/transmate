@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
-// API基础配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// API基础配置（连接设置里保存的地址优先，其次环境变量，最后本地默认）
+const API_BASE_URL = localStorage.getItem('tm_api_base') || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 // 创建axios实例
 const apiClient: AxiosInstance = axios.create({

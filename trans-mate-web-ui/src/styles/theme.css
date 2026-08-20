@@ -1,0 +1,104 @@
+/* 全局设计 tokens：浅色默认，html.dark 覆盖为深色
+   Home / Settings / 聊天组件统一引用，保证明暗两套一致 */
+:root {
+  --color-primary: #2563eb;
+  --color-primary-deep: #1d4ed8;
+  --color-primary-soft: #e8f0fe;
+  --color-primary-soft-strong: #d4e2fd;
+  --color-surface: #ffffff;
+  --color-sidebar: #f7f8fa;
+  --color-fill: #f2f3f5;
+  --color-fill-strong: #e8eaee;
+  --color-hover: #f0f1f3;
+  --color-soft-bg: #f7f8fa;
+  --color-border: #e5e6eb;
+  --color-border-strong: #d3d5db;
+  --color-text: #1f2329;
+  --color-text-secondary: #4e5969;
+  --color-text-muted: #86909c;
+  --color-text-faint: #c9cdd4;
+  --color-danger: #f53f3f;
+  --color-danger-deep: #cb272d;
+  --color-danger-soft: #ffece8;
+  --color-success: #00b42a;
+  --color-tooltip: #1f2329;
+  --color-tooltip-text: #ffffff;
+  --radius-card: 16px;
+  --shadow-card: 0 4px 16px rgba(31, 35, 41, 0.06);
+  --transition: 0.2s ease;
+}
+
+html.dark {
+  --color-primary: #4c8dff;
+  --color-primary-deep: #3b7ae8;
+  --color-primary-soft: #1e2a4d;
+  --color-primary-soft-strong: #27365e;
+  --color-surface: #232429;
+  --color-sidebar: #17181c;
+  --color-fill: #2a2b31;
+  --color-fill-strong: #323339;
+  --color-hover: #2a2b31;
+  --color-soft-bg: #1e1f24;
+  --color-border: #36373d;
+  --color-border-strong: #45464d;
+  --color-text: #e8e9ec;
+  --color-text-secondary: #a9adb6;
+  --color-text-muted: #8f939c;
+  --color-text-faint: #5f636c;
+  --color-danger: #f76560;
+  --color-danger-deep: #e5443f;
+  --color-danger-soft: #42201f;
+  --color-success: #27c346;
+  --color-tooltip: #f0f1f3;
+  --color-tooltip-text: #1f2329;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* 代码高亮：浅色沿用 github.css，深色在此覆盖（选择器优先级高于 .hljs） */
+html.dark .markdown-body pre.hljs,
+html.dark .markdown-body pre .hljs {
+  background: var(--color-soft-bg);
+  color: #c9d1d9;
+}
+
+html.dark .hljs-comment,
+html.dark .hljs-quote {
+  color: #8b949e;
+}
+
+html.dark .hljs-keyword,
+html.dark .hljs-selector-tag,
+html.dark .hljs-meta,
+html.dark .hljs-tag {
+  color: #ff7b72;
+}
+
+html.dark .hljs-string,
+html.dark .hljs-regexp {
+  color: #a5d6ff;
+}
+
+html.dark .hljs-number,
+html.dark .hljs-literal,
+html.dark .hljs-symbol {
+  color: #79c0ff;
+}
+
+html.dark .hljs-title,
+html.dark .hljs-name,
+html.dark .hljs-selector-id,
+html.dark .hljs-selector-class {
+  color: #d2a8ff;
+}
+
+html.dark .hljs-attr,
+html.dark .hljs-attribute,
+html.dark .hljs-variable,
+html.dark .hljs-template-variable {
+  color: #ffa657;
+}
+
+html.dark .hljs-built_in,
+html.dark .hljs-type {
+  color: #f2cc60;
+}

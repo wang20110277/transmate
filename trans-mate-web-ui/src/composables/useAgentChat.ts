@@ -1,6 +1,7 @@
 import { ref, onUnmounted, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { AgentEvent, Conversation, Message, ToolCallBlock } from '@/types'
+import { t } from '@/i18n'
 import {
   listConversations,
   createConversation,
@@ -68,7 +69,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
       case 'agent_start': {
         const index = ensureAssistantMessage()
         dialogue.value[index].agent = event.agent
-        processingStatus.value = `智能体 ${event.agent} 正在工作...`
+        processingStatus.value = t('chat.agentWorking', { agent: event.agent })
         break
       }
       case 'token': {
@@ -177,7 +178,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
     if (!socket.value || socket.value.readyState !== WebSocket.OPEN) return false
     dialogue.value.push({ role: 'user', content: message, timestamp: Date.now() })
     isProcessing.value = true
-    processingStatus.value = '正在思考中...'
+    processingStatus.value = t('chat.thinking')
     socket.value.send(
       JSON.stringify({
         type: 'chat_message',

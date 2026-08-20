@@ -1,15 +1,7 @@
 <template>
   <div class="chat-sidebar">
-    <div class="sidebar-header">
-      <span class="sidebar-title">会话</span>
-      <button class="new-chat-btn" @click="$emit('newConversation')" title="新建会话">
-        <i class="fas fa-plus"></i>
-        <span>新会话</span>
-      </button>
-    </div>
-
     <div class="conversation-list">
-      <div v-if="conversations.length === 0" class="empty-tip">暂无历史会话</div>
+      <div v-if="conversations.length === 0" class="empty-tip">{{ t('chat.emptyConversations') }}</div>
       <div
         v-for="conversation in conversations"
         :key="conversation.id"
@@ -18,12 +10,12 @@
       >
         <i class="fas fa-comment-dots conversation-icon"></i>
         <div class="conversation-info">
-          <div class="conversation-title">{{ conversation.title || '新会话' }}</div>
+          <div class="conversation-title">{{ conversation.title || t('chat.untitled') }}</div>
           <div class="conversation-time">{{ formatTime(conversation.updated_at || conversation.created_at) }}</div>
         </div>
         <button
           class="delete-btn"
-          title="删除会话"
+          :title="t('chat.deleteConversation')"
           @click.stop="$emit('removeConversation', conversation.id)"
         >
           <i class="fas fa-trash-alt"></i>
@@ -34,7 +26,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from '@/i18n'
 import type { Conversation } from '@/types'
+
+const { t } = useI18n()
 
 defineProps<{
   conversations: Conversation[]
@@ -62,83 +57,53 @@ const formatTime = (value?: string): string => {
 .chat-sidebar {
   display: flex;
   flex-direction: column;
-  width: 220px;
-  min-width: 220px;
+  width: 100%;
   height: 100%;
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  min-height: 0;
   overflow: hidden;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 12px 10px;
-}
-
-.sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
-  letter-spacing: 1px;
-}
-
-.new-chat-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 10px;
-  font-size: 12px;
-  color: #fff;
-  background: rgba(64, 158, 255, 0.85);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.new-chat-btn:hover {
-  background: #409eff;
 }
 
 .conversation-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0 8px 12px;
+  padding: 0 2px 8px;
 }
 
 .empty-tip {
   padding: 20px 8px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-faint);
   text-align: center;
+  line-height: 1.6;
 }
 
 .conversation-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 9px 10px;
-  margin-bottom: 4px;
-  border-radius: 8px;
+  margin-bottom: 2px;
+  border-radius: 10px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .conversation-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-hover);
 }
 
 .conversation-item.active {
-  background: rgba(64, 158, 255, 0.22);
+  background: var(--color-primary-soft);
 }
 
 .conversation-icon {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.conversation-item.active .conversation-icon {
+  color: var(--color-primary);
 }
 
 .conversation-info {
@@ -148,28 +113,34 @@ const formatTime = (value?: string): string => {
 
 .conversation-title {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.conversation-item.active .conversation-title {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
 .conversation-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-faint);
   margin-top: 2px;
 }
 
 .delete-btn {
   padding: 4px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-muted);
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   opacity: 0;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .conversation-item:hover .delete-btn {
@@ -177,6 +148,7 @@ const formatTime = (value?: string): string => {
 }
 
 .delete-btn:hover {
-  color: #f56c6c;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
 }
 </style>
