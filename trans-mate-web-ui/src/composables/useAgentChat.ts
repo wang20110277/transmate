@@ -10,7 +10,7 @@ import {
 
 interface UseAgentChatOptions {
   userId: MaybeRefOrGetter<string>
-  /** 一条回复完成（含停止/出错前已生成内容）后的回调，用于数字人播报等 */
+  /** 一条回复完成（含停止/出错前已生成内容）后的回调，用于语音播报等 */
   onReplyComplete?: (content: string) => void
 }
 

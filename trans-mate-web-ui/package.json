@@ -33,7 +33,6 @@
     "express": "^5.1.0",
     "highlight.js": "^11.12.0",
     "markdown-it": "^15.0.0",
-    "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
     "pinia": "^3.0.4",
     "update-electron-app": "^3.3.0",
     "vue": "^3.5.18",

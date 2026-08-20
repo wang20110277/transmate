@@ -19,13 +19,6 @@
           >
             <i class="fas fa-history"></i>
           </button>
-          <button
-            :class="['rail-btn', { active: !avatarCollapsed }]"
-            title="数字人面板"
-            @click="avatarCollapsed = !avatarCollapsed"
-          >
-            <i class="fas fa-video"></i>
-          </button>
         </div>
         <div class="rail-bottom">
           <button class="rail-btn" title="主页" @click="goHome">
@@ -84,74 +77,19 @@
           @toggle-recording="toggleRecording"
         />
       </div>
-
-      <!-- 最右：数字人面板（可折叠） -->
-      <div v-show="!avatarCollapsed" class="avatar-panel">
-        <div class="avatar-topbar">
-          <span class="avatar-user-avatar">
-            <i class="fas fa-user"></i>
-          </span>
-          <div class="avatar-user-info">
-            <div class="avatar-user-name">{{ displayName }}</div>
-            <div class="avatar-user-status">
-              <span :class="['status-dot', avatarSessionActive ? 'on' : 'off']"></span>
-              {{ avatarSessionActive ? '数字人已就绪' : '数字人未连接' }}
-            </div>
-          </div>
-          <button class="avatar-reconnect-btn" title="重新连接数字人" @click="restartAvatar">
-            <i class="fas fa-sync-alt"></i>
-          </button>
-          <button class="avatar-panel-btn" title="收起面板" @click="avatarCollapsed = true">
-            <i class="fas fa-chevron-right"></i>
-          </button>
-        </div>
-
-        <div id="video-container">
-          <div id="remoteVideo" style="width:100%;height:100%;"></div>
-          <canvas id="canvas" style="max-width: 1920px; height: 1080px; background-color: transparent;" hidden="hidden"></canvas>
-          <canvas id="tmpCanvas" style="max-width: 1920px; height: 1080px;" hidden="hidden"></canvas>
-        </div>
-        <div class="subtitle-wrapper-home">
-          <ScrollSubtitle :text="spokenText" v-if="spokenText" @complete="spokenText = ''" />
-        </div>
-      </div>
-
-      <!-- 数字人面板折叠后的展开把手 -->
-      <button
-        v-show="avatarCollapsed"
-        class="avatar-expand-handle"
-        title="展开数字人面板"
-        @click="avatarCollapsed = false"
-      >
-        <i class="fas fa-chevron-left"></i>
-        <span class="handle-text">数字人</span>
-      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
-import ScrollSubtitle from '../components/ScrollSubtitle.vue';
 import ChatSidebar from '../components/agent/ChatSidebar.vue';
 import MessageList from '../components/agent/MessageList.vue';
 import ChatInput from '../components/agent/ChatInput.vue';
 import { useAgentChat } from '@/composables/useAgentChat';
 import { transcribeAudio, synthesizeSpeech } from '@/services/api';
-import {
-  getOrCreateSpeechConfig,
-  getAvatarSynthesizer,
-  setAvatarSynthesizer,
-  setPeerConnection,
-  getPeerConnection,
-  setAvatarSessionInitialized,
-  isAvatarSessionInitialized,
-  resetAzureInstances,
-  SpeechSDK
-} from '../services/azure-sdk';
-import { appConfig } from '../config/app-config';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -165,19 +103,8 @@ const ttsEnabled = ref<boolean>(true);
 const isSpeaking = ref<boolean>(false);
 let currentAudio: HTMLAudioElement | null = null;
 const userId = ref<string>('anonymous');
-const spokenText = ref<string>('');
-const avatarSessionActive = ref<boolean>(false);
-const avatarCharacter = ref<string>('lisa');
-const avatarStyle = ref<string>('casual-sitting');
 const showConversations = ref<boolean>(false);
-const avatarCollapsed = ref<boolean>(false);
 
-const displayName = computed(() => userStore.userInfo?.nickname || '访客用户');
-
-const currentVoiceIndex = ref<number>(0);
-const currentVoice = appConfig.availableVoices[currentVoiceIndex.value];
-const region = appConfig.azureRegion;
-const subscriptionKey = appConfig.azureSubscriptionKey;
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 
@@ -261,10 +188,7 @@ const {
 } = useAgentChat({
   userId,
   onReplyComplete: (content) => {
-    spokenText.value = content;
-    if (avatarEnabled && avatarSessionActive.value) {
-      speakWithAvatar();
-    } else if (ttsEnabled.value) {
+    if (ttsEnabled.value) {
       playTts(content);
     }
   }
@@ -317,12 +241,6 @@ const goSettings = () => { router.push('/personal-center'); };
 
 const goHome = () => { router.push('/'); };
 
-const restartAvatar = () => {
-  avatarSessionActive.value = false;
-  setAvatarSessionInitialized(false);
-  startAvatarSession();
-};
-
 const sendMessage = () => {
   const text = newMessage.value;
   if (!text.trim()) return;
@@ -334,142 +252,6 @@ const sendMessage = () => {
   newMessage.value = '';
 };
 
-const fetchIceServerInfo = async (key: string, reg: string) => {
-  try {
-    const axios = (await import('axios')).default;
-    const response = await axios.get(
-      `https://${reg}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`,
-      { headers: { 'Ocp-Apim-Subscription-Key': key }, timeout: 60000 }
-    );
-    if (response.status !== 200) throw new Error('Token acquisition failed: ' + response.status + ' ' + response.statusText);
-    return response.data;
-  } catch (error: any) {
-    console.error('WebRTC连接失败', error);
-  }
-};
-
-const setupWebRTC = (iceServerUrl: string, iceServerUsername: string, iceServerCredential: string) => {
-  const newPeerConnection = new RTCPeerConnection({
-    iceServers: [{ urls: [iceServerUrl], username: iceServerUsername, credential: iceServerCredential }]
-  });
-  setPeerConnection(newPeerConnection);
-  newPeerConnection.ontrack = function (event: RTCTrackEvent) {
-    if (event.track.kind === 'video') {
-      const videoContainer = document.getElementById('remoteVideo');
-      if (!videoContainer) return;
-      videoContainer.innerHTML = '';
-      const videoElement = document.createElement('video');
-      videoElement.id = 'videoPlayer';
-      videoElement.srcObject = event.streams[0];
-      videoElement.autoplay = true;
-      videoElement.muted = false;
-      videoElement.playsInline = true;
-      videoElement.style.width = '100%';
-      videoElement.style.height = '100%';
-      videoElement.style.objectFit = 'contain';
-      videoContainer.appendChild(videoElement);
-    }
-    if (event.track.kind === 'audio') {
-      const existingAudio = document.getElementById('audioPlayer');
-      if (existingAudio) existingAudio.remove();
-      const audioElement = document.createElement('audio');
-      audioElement.id = 'audioPlayer';
-      audioElement.srcObject = event.streams[0];
-      audioElement.autoplay = true;
-      audioElement.muted = true;
-      document.body.appendChild(audioElement);
-    }
-  };
-  newPeerConnection.oniceconnectionstatechange = function () {
-    if (newPeerConnection.iceConnectionState === 'connected') {
-      avatarSessionActive.value = true;
-    } else if (newPeerConnection.iceConnectionState === 'failed') {
-      avatarSessionActive.value = false;
-      showError.value = true;
-      errorMessage.value = '数字人连接失败，请检查网络连接和配置';
-    } else if (newPeerConnection.iceConnectionState === 'disconnected' || newPeerConnection.iceConnectionState === 'closed') {
-      avatarSessionActive.value = false;
-    }
-  };
-  try {
-    newPeerConnection.addTransceiver('video', { direction: 'sendrecv' });
-    newPeerConnection.addTransceiver('audio', { direction: 'sendrecv' });
-  } catch (error: any) {
-    showError.value = true;
-    errorMessage.value = `添加音视频收发器失败: ${error.message || '未知错误'}`;
-  }
-};
-
-// 未配置 Azure 订阅密钥时静默禁用数字人功能，聊天不受影响
-const avatarEnabled = Boolean(subscriptionKey);
-
-const startAvatarSession = async () => {
-  if (!avatarEnabled) return;
-  if (isAvatarSessionInitialized() && avatarSessionActive.value) return;
-  try {
-    const speechConfig = getOrCreateSpeechConfig(subscriptionKey, region, currentVoice);
-    const videoFormat = new SpeechSDK.AvatarVideoFormat();
-    const avatarConfiguration: any = new SpeechSDK.AvatarConfig(avatarCharacter.value, avatarStyle.value, videoFormat);
-    avatarConfiguration.backgroundColor = 'white';
-    const iceServerInfo = await fetchIceServerInfo(subscriptionKey, region);
-    if (!iceServerInfo) {
-      showError.value = true;
-      errorMessage.value = '获取ICE服务器信息失败。请检查您的Azure订阅。';
-      return;
-    }
-    setupWebRTC(iceServerInfo.Urls[0], iceServerInfo.Username, iceServerInfo.Password);
-    const newAvatarSynthesizer = new SpeechSDK.AvatarSynthesizer(speechConfig, avatarConfiguration);
-    setAvatarSynthesizer(newAvatarSynthesizer);
-    newAvatarSynthesizer.startAvatarAsync(getPeerConnection()!).then(
-      () => {
-        avatarSessionActive.value = true;
-        setAvatarSessionInitialized(true);
-      }
-    ).catch((error: any) => {
-      showError.value = true;
-      errorMessage.value = `Avatar failed to start: ${error.message || 'Unknown error'}`;
-    });
-    avatarSessionActive.value = true;
-  } catch (error: any) {
-    avatarSessionActive.value = false;
-    showError.value = true;
-    errorMessage.value = `启动数字人会话失败: ${error.message || '未知错误'}`;
-  }
-};
-
-const speakWithAvatar = async () => {
-  if (!avatarEnabled) return;
-  if (!avatarSessionActive.value) await startAvatarSession();
-  const currentAvatarSynthesizer = getAvatarSynthesizer();
-  if (!currentAvatarSynthesizer) {
-    showError.value = true;
-    errorMessage.value = '虚拟形象合成器未初始化。请尝试重新启动。';
-    return;
-  }
-
-  try {
-    const text = spokenText.value;
-
-    currentAvatarSynthesizer.speakTextAsync(text).then(
-      (result: any) => {
-        if (result.reason === SpeechSDK.ResultReason.Canceled) {
-          const cancellationDetails = SpeechSDK.CancellationDetails.fromResult(result);
-          if (cancellationDetails.reason === SpeechSDK.CancellationReason.Error) {
-            showError.value = true;
-            errorMessage.value = `数字人合成错误: ${cancellationDetails.errorDetails || '未知错误'}`;
-          }
-        }
-      }
-    ).catch((error: any) => {
-      showError.value = true;
-      errorMessage.value = `合成语音和数字人失败: ${error.message || '未知错误'}`;
-    });
-  } catch (error: any) {
-    showError.value = true;
-    errorMessage.value = `合成语音和数字人失败: ${error.message || '未知错误'}`;
-  }
-};
-
 onMounted(async () => {
   // 初始化用户状态
   userStore.initFromStorage();
@@ -479,22 +261,11 @@ onMounted(async () => {
 
   connect();
   refreshConversations();
-  setTimeout(async () => { await startAvatarSession(); }, 1000);
-  document.addEventListener('visibilitychange', async () => {
-    if (!document.hidden && !avatarSessionActive.value) await startAvatarSession();
-  });
 });
 
 onUnmounted(() => {
   if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
   stopAudio();
-  const currentAvatarSynthesizer = getAvatarSynthesizer();
-  if (currentAvatarSynthesizer) {
-    currentAvatarSynthesizer.close();
-    resetAzureInstances();
-  }
-  const currentPeerConnection = getPeerConnection();
-  if (currentPeerConnection) currentPeerConnection.close();
 });
 </script>
 
@@ -619,191 +390,6 @@ onUnmounted(() => {
   height: 100%;
 }
 
-/* ===== 最右：数字人面板（可折叠） ===== */
-.home-layout .avatar-panel {
-  flex: 1.1;
-  display: flex;
-  flex-direction: column;
-  min-width: 300px;
-  max-width: 460px;
-  background: linear-gradient(160deg, #1e3a8a 0%, #1e40af 55%, #1d4ed8 100%);
-  border-radius: 16px;
-  overflow: hidden;
-  position: relative;
-  box-shadow: var(--shadow-lg);
-}
-
-.home-layout .avatar-reconnect-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  font-size: 15px;
-  color: #1e40af;
-  background: #fff;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  transition: all var(--transition);
-}
-
-.home-layout .avatar-reconnect-btn:hover {
-  background: #eff6ff;
-  transform: scale(1.08);
-}
-
-.home-layout .avatar-reconnect-btn:active {
-  transform: scale(0.97);
-}
-
-.home-layout .avatar-panel-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  font-size: 15px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
-  border-radius: 50%;
-  cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-  transition: all var(--transition);
-}
-
-.home-layout .avatar-panel-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.35);
-  transform: scale(1.08);
-}
-
-/* 折叠后的展开把手（贴右缘竖条） */
-.home-layout .avatar-expand-handle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 44px;
-  padding: 16px 0;
-  color: rgba(255, 255, 255, 0.85);
-  background: linear-gradient(180deg, #172554 0%, #1e3a8a 100%);
-  border: none;
-  border-radius: 16px;
-  cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  transition: background var(--transition);
-}
-
-.home-layout .avatar-expand-handle:hover {
-  background: linear-gradient(180deg, #1e3a8a 0%, #1d4ed8 100%);
-}
-
-.home-layout .handle-text {
-  writing-mode: vertical-rl;
-  letter-spacing: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.home-layout .avatar-topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  background: rgba(0, 0, 0, 0.18);
-}
-
-.home-layout .avatar-user-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  font-size: 16px;
-  color: #1e3a8a;
-  background: #e0e7ff;
-  border: 2px solid rgba(255, 255, 255, 0.65);
-  border-radius: 50%;
-}
-
-.home-layout .avatar-user-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.home-layout .avatar-user-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.home-layout .avatar-user-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.home-layout .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-}
-
-.home-layout .status-dot.on {
-  background: #4ade80;
-  box-shadow: 0 0 6px rgba(74, 222, 128, 0.9);
-}
-
-.home-layout .status-dot.off {
-  background: #fbbf24;
-  box-shadow: 0 0 6px rgba(251, 191, 36, 0.7);
-}
-
-.home-layout #video-container {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  min-height: 280px;
-}
-
-.home-layout #remoteVideo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-/* 字幕容器定位 */
-.subtitle-wrapper-home {
-  position: absolute;
-  bottom: 20px;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.subtitle-wrapper-home > * {
-  pointer-events: auto;
-}
-
 /* ===== 中间：智能体对话（主区，内容居中） ===== */
 .home-layout .chat-container {
   flex: 1;
@@ -882,13 +468,6 @@ onUnmounted(() => {
   align-items: center;
   cursor: pointer;
   font-size: 0.875rem;
-}
-
-@media (max-width: 1100px) {
-  .home-layout .avatar-panel,
-  .home-layout .avatar-expand-handle {
-    display: none;
-  }
 }
 
 @media (max-width: 760px) {
