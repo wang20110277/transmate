@@ -832,6 +832,8 @@ onUnmounted(() => {
   border-radius: 999px;
   cursor: pointer;
   transition: all var(--transition);
+  /* 头部是窗口拖动区，按钮需标记 no-drag 保持可点击 */
+  -webkit-app-region: no-drag;
 }
 
 .home-layout .tts-toggle:hover {
