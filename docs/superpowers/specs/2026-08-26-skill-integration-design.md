@@ -152,3 +152,12 @@ agent = create_deep_agent(
 6. MinIO 直读 SkillsBackend(免物化)
 7. 沙箱配额统计与清理策略
 8. 技能来源白名单 / 审核机制
+9. **新路由鉴权**:`/api/skills/*`、`/api/artifacts/*` 当前以显式 `user_id` 参数调用、无鉴权中间件——沿用 `chat_routes` 全仓既有姿态(单用户桌面/localhost 场景)。**多用户或非 localhost 部署前必须补齐**(仓库已有 JWT 基建可挂)。(最终审查裁定记录)
+10. **制品下载链路加固**:预签名 URL 绑定服务端 `MINIO_ENDPOINT` 主机名,要求该地址对前端客户端可达;如部署拓扑不允许,需改为后端流式下载路由。另:`save_artifact` 的 `read_bytes` 全量内存(上限 200MB)可改流式;工具 `name` 参数建议 `Path(name).name` 清洗;异常文案避免透出原始错误。(最终审查裁定记录)
+
+## 11. 实现期有意识偏差记录(最终审查确认)
+
+- **安装原子性**:以"本地临时目录全量校验 → 上传正式前缀 → PG 清单最后提交(可见性以清单为准)"实现,替代原文"临时前缀→改名"的对象存储不可原子改名方案;失败路径 `delete_prefix` 清理,保证不留半成品。
+- **测试替身签名跟进**:`astream` 增加 `user_id` 参数后,存量 streaming/chat_ws/ws_protocol 测试替身同步加 `user_id=None`(断言零改动)。
+- **工具配置注入**:`save_artifact` 的注入参数命名 `run_config`(`config` 与配置模块冲突且 langchain 不建议)。
+- **物化时机**:每轮 `_get_agent_for_user` 调用都校验清单指纹(指纹未变时成本为一次 PG 查询+清单文件读),而非仅构建时——保证安装/卸载对已缓存 agent 即时生效。(最终审查 Critical 修复)
