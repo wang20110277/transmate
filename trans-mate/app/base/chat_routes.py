@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
+import logging
+
 from app.core.database import get_db
+from app.llm.harness import get_agent_harness
 from app.schemas.chat import (
     ConversationCreate,
     ConversationUpdate,
@@ -15,6 +18,8 @@ from app.schemas.chat import (
     MessageResponse,
 )
 from app.services import chat_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversations", tags=["会话"])
 
@@ -57,9 +62,13 @@ async def update_conversation(
 
 @router.delete("/{conversation_id}")
 async def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
-    """删除会话及其全部消息"""
+    """删除会话及其全部消息，并清理 agent checkpoint"""
     if not chat_service.delete_conversation(db, conversation_id):
         raise HTTPException(status_code=404, detail="会话不存在")
+    try:
+        await get_agent_harness().clear_thread(f"conv-{conversation_id}")
+    except Exception as e:
+        logger.warning(f"清除会话 checkpoint 失败 conversation_id={conversation_id}: {e}")
     return {"message": "会话已删除"}
 
 

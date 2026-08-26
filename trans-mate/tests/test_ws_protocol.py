@@ -42,7 +42,10 @@ def collect_until_done(ws, expected_type="done"):
 def test_ws_full_flow_with_auto_conversation(client):
     test_client, engine = client
 
-    async def fake_stream(history):
+    seen_threads = []
+
+    async def fake_stream(history, thread_id):
+        seen_threads.append(thread_id)
         yield {"type": "status", "message": "正在分析意图..."}
         yield {"type": "agent_start", "agent": "base_agent"}
         yield {"type": "token", "content": f"收到{len(history)}条历史。"}
@@ -87,6 +90,8 @@ def test_ws_full_flow_with_auto_conversation(client):
         assert len(messages) == 4
         assert [m.role for m in messages] == ["user", "assistant", "user", "assistant"]
         assert db.get(Conversation, conversation_id).title == "你好"
+        # 两轮对话各自携带 conv-{conversation_id} 的 thread 标识
+        assert seen_threads == [f"conv-{conversation_id}"] * 2
         db.close()
     finally:
         main_module.stream_agent_events = original
@@ -97,7 +102,7 @@ def test_ws_stop_generation(client):
     test_client, engine = client
     import asyncio
 
-    async def slow_stream(history):
+    async def slow_stream(history, thread_id):
         yield {"type": "token", "content": "开始回答"}
         await asyncio.sleep(60)
         yield {"type": "done", "content": "不该到达"}
@@ -127,7 +132,7 @@ def test_ws_plain_text_compat(client):
     """纯文本消息应被兼容解析为 chat_message"""
     test_client, engine = client
 
-    async def fake_stream(history):
+    async def fake_stream(history, thread_id):
         yield {"type": "token", "content": "ok"}
         yield {"type": "done", "content": "ok"}
 

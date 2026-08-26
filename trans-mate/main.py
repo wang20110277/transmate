@@ -12,6 +12,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.llm.streaming import stream_agent_events, build_history_messages
+from app.llm.harness import get_agent_harness
 from app.core.database import init_db, SessionLocal
 from app.core.config import ALLOWED_ORIGINS, CORS_ALLOW_CREDENTIALS
 from app.base.auth_routes import router as auth_router
@@ -33,8 +34,18 @@ async def lifespan(app: FastAPI):
     init_db()
     logging.info("数据库初始化完成")
 
+    try:
+        await get_agent_harness().initialize()
+        logging.info("agent harness 初始化完成")
+    except Exception as e:
+        logging.error(f"agent harness 初始化失败（首次调用时将重试）: {e}")
+
     yield
     logging.info("应用关闭，清理资源...")
+    try:
+        await get_agent_harness().aclose()
+    except Exception as e:
+        logging.warning(f"agent harness 关闭异常: {e}")
 
 
 app = FastAPI(
@@ -87,7 +98,7 @@ async def run_agent_stream(
         records = chat_service.list_messages(db, conversation_id, limit=20)
         history = build_history_messages(records)
 
-        async for event in stream_agent_events(history):
+        async for event in stream_agent_events(history, f"conv-{conversation_id}"):
             if event["type"] == "done":
                 chat_service.add_message(
                     db,
