@@ -98,6 +98,22 @@ export function useAgentChat(options: UseAgentChatOptions) {
         }
         break
       }
+      case 'plan_update': {
+        const index = ensureAssistantMessage()
+        dialogue.value[index].todos = event.todos
+        break
+      }
+      case 'subagent_start': {
+        const index = ensureAssistantMessage()
+        dialogue.value[index].activeSubagent = event.name
+        processingStatus.value = t('chat.subagentWorking', { agent: event.name })
+        break
+      }
+      case 'subagent_end': {
+        const last = dialogue.value[dialogue.value.length - 1]
+        if (last?.role === 'assistant') last.activeSubagent = undefined
+        break
+      }
       case 'conversation_created':
         currentConversationId.value = event.conversation_id
         break

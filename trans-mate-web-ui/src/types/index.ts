@@ -8,6 +8,13 @@ interface ToolCallBlock {
   running: boolean;
 }
 
+type TodoStatus = 'pending' | 'in_progress' | 'completed'
+
+interface TodoItem {
+  content: string
+  status: TodoStatus
+}
+
 interface Message {
   role?: string;
   content?: string;
@@ -18,6 +25,10 @@ interface Message {
   streaming?: boolean;
   // 智能体扩展：该条消息使用的智能体（base_agent 等）
   agent?: string;
+  // deep agent 扩展：任务计划（write_todos）
+  todos?: TodoItem[]
+  // deep agent 扩展：正在执行的子智能体名
+  activeSubagent?: string
 }
 
 // WebSocket 智能体事件（ZCode 式事件流）
@@ -27,6 +38,9 @@ type AgentEvent =
   | { type: 'token'; content: string }
   | { type: 'tool_call'; id: string; name: string; args?: unknown }
   | { type: 'tool_result'; id: string; name: string; result: string }
+  | { type: 'plan_update'; todos: TodoItem[] }
+  | { type: 'subagent_start'; name: string; description?: string; task?: string }
+  | { type: 'subagent_end'; name: string; result?: string }
   | { type: 'conversation_created'; conversation_id: number }
   | { type: 'done'; content: string; tool_events?: ToolCallBlock[] }
   | { type: 'stopped'; message: string }
@@ -66,6 +80,8 @@ interface ParsedWebSocketMessage {
 export type {
   Message,
   ToolCallBlock,
+  TodoStatus,
+  TodoItem,
   AgentEvent,
   Conversation,
   ConversationMessage,
