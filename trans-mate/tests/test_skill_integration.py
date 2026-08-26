@@ -108,3 +108,33 @@ def test_legacy_path_unchanged(db):
     finally:
         deepagents.create_deep_agent = original
     assert "skills" not in captured and "backend" not in captured
+
+
+@pytest.mark.integration
+def test_cached_agent_sees_newly_installed_skill(workspace, db, monkeypatch):
+    """安装新技能后,已缓存的用户 agent 无需重建即可看到该技能(最终审查 Critical#1)"""
+    from deepagents.middleware.skills import _list_skills
+
+    import app.llm.harness.deep_agent_harness as dah
+    from app.models.skill import UserSkill
+    from tests.fake_storage import FakeStorage
+
+    storage = FakeStorage()
+    storage.put_bytes(
+        "skills/u1/late-skill/SKILL.md",
+        "---\nname: late-skill\ndescription: 后装技能\n---\n# Late\n".encode("utf-8"),
+    )
+    monkeypatch.setattr("app.services.skill_service._storage_singleton_override", storage)
+
+    harness = dah.DeepAgentHarness()
+    harness._model = _FakeModel()
+    harness._get_agent_for_user("u1", db)  # 首次:缓存 agent,清单只有 demo-skill
+
+    db.add(UserSkill(user_id="u1", name="late-skill", version="v1", description="",
+                     source="test"))
+    db.commit()
+
+    harness._get_agent_for_user("u1", db)  # 第二次:命中缓存,但物化必须重跑
+    backend = dah._build_backend("u1")
+    names = [s["name"] for s in _list_skills(backend, "/skills/")]
+    assert "late-skill" in names

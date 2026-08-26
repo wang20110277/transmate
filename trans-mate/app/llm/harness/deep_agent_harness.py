@@ -182,11 +182,13 @@ class DeepAgentHarness(AgentHarness):
     def _get_agent_for_user(self, user_id: str, db: Session | None):
         from app.llm.harness.skill_materializer import sync_user_skills
 
+        # 每轮都校验清单指纹:安装/卸载后已缓存 agent 的 /skills/ 立即生效(spec §3.3)
+        # 物化失败在 sync_user_skills 内降级为现状缓存目录,不阻塞对话(spec §5)
+        sync_user_skills(db, user_id)
+
         if user_id in self._user_agents:
             self._user_agents.move_to_end(user_id)
             return self._user_agents[user_id]
-        # 物化失败降级为空缓存目录,不阻塞对话(spec §5)
-        sync_user_skills(db, user_id)
         model = self._model or _build_model()
         agent = _build_agent(model, self._checkpointer, user_id=user_id)
         self._user_agents[user_id] = agent

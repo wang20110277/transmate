@@ -1,5 +1,5 @@
 """制品路由:列表/下载(预签名 URL)"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,8 +21,8 @@ def _get_storage_service():
 async def list_artifacts(
     user_id: str,
     conversation_id: int | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     query = db.query(Artifact).filter_by(user_id=user_id)
@@ -49,5 +49,8 @@ async def download_artifact(artifact_id: int, user_id: str, db: Session = Depend
     row = db.query(Artifact).filter_by(id=artifact_id, user_id=user_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="制品不存在")
-    url = _get_storage_service().presigned_get_url(row.storage_key, PRESIGN_EXPIRES_SECONDS)
+    try:
+        url = _get_storage_service().presigned_get_url(row.storage_key, PRESIGN_EXPIRES_SECONDS)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"对象存储不可用: {exc}") from exc
     return ArtifactDownloadResponse(url=url)
