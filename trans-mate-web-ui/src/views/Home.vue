@@ -7,7 +7,7 @@
 
       <div class="brand">
         <span class="brand-logo">
-          <img src="/icons/logo.svg" alt="logo" class="brand-logo-img">
+          <img src="/icons/trans.svg" alt="logo" class="brand-logo-img">
         </span>
         <span class="brand-name">TransMate</span>
       </div>
@@ -478,8 +478,8 @@ onUnmounted(() => {
 }
 
 .home-layout .brand-logo-img {
-  width: 22px;
-  height: 22px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 

@@ -4,7 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    // 应用图标（Dock/Finder 显示），由 public/icons/trans.svg 生成；不带扩展名，packager 按平台自动补全
+    // 应用图标统一来源：build/icons/trans.png（icns/ico 为其平台派生格式）；不带扩展名，packager 按平台自动补全
     icon: require('node:path').resolve(__dirname, 'build/icons/trans'),
   },
   rebuildConfig: {},

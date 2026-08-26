@@ -2,7 +2,7 @@
   <header>
     <div class="header-content">
       <div class="header-left">
-        <img src="/icons/logo.svg" alt="虚拟柜员图标" class="logo">
+        <img src="/icons/trans.svg" alt="虚拟柜员图标" class="logo">
         <span class="header-title">欢迎使用 TransMate 智能助手</span>
       </div>
       <div class="header-right">
