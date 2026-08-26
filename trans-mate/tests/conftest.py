@@ -33,6 +33,7 @@ def db():
     """chat_service 单测用的独立内存库会话"""
     from app.models.user import User  # noqa: F401
     from app.models.conversation import Conversation, ChatMessage  # noqa: F401
+    from app.models.skill import UserSkill, Artifact  # noqa: F401
 
     engine = make_sqlite_engine()
     Base.metadata.create_all(engine)

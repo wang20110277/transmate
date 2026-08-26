@@ -106,3 +106,35 @@ CHECKPOINT_DB_PATH = os.getenv(
         "agent_checkpoints.sqlite",
     ),
 )
+
+# Skill 注册表(GitHub 仓库,默认 anthropics/skills)
+SKILL_REGISTRY_OWNER = os.getenv("SKILL_REGISTRY_OWNER", "anthropics")
+SKILL_REGISTRY_REPO = os.getenv("SKILL_REGISTRY_REPO", "skills")
+SKILL_REGISTRY_REF = os.getenv("SKILL_REGISTRY_REF", "main")
+SKILL_REGISTRY_SUBDIR = os.getenv("SKILL_REGISTRY_SUBDIR", "")
+SKILL_REGISTRY_TOKEN = os.getenv("SKILL_REGISTRY_TOKEN", "")
+SKILL_REGISTRY_PROXY = os.getenv("SKILL_REGISTRY_PROXY", "")
+SKILL_REGISTRY_CACHE_TTL = float(os.getenv("SKILL_REGISTRY_CACHE_TTL", "300"))
+
+# MinIO 对象存储
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "127.0.0.1:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "transmate")
+MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
+
+# 用户云工作区
+SANDBOX_ROOT = os.getenv(
+    "SANDBOX_ROOT",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "store", "sandbox"),
+)
+SKILL_CACHE_ROOT = os.getenv(
+    "SKILL_CACHE_ROOT",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "store", "skill_cache"),
+)
+
+# 防护上限(spec §6)
+SKILL_MAX_FILE_BYTES = int(os.getenv("SKILL_MAX_FILE_BYTES", str(10 * 1024 * 1024)))
+SKILL_MAX_FILES = int(os.getenv("SKILL_MAX_FILES", "200"))
+ARTIFACT_MAX_BYTES = int(os.getenv("ARTIFACT_MAX_BYTES", str(200 * 1024 * 1024)))
+ARTIFACT_MAX_COUNT = int(os.getenv("ARTIFACT_MAX_COUNT", "500"))

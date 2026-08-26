@@ -17,6 +17,8 @@ from alembic import context
 # 导入数据库配置和模型
 from app.core.database import Base
 from app.models.user import User  # noqa: F401
+from app.models.conversation import Conversation, ChatMessage  # noqa: F401
+from app.models.skill import UserSkill, Artifact  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -70,9 +72,9 @@ def run_migrations_online() -> None:
     """
     # 获取数据库 URL
     from app.core.database import DATABASE_URL
-    
-    # 更新 config 中的 sqlalchemy.url
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+    # 更新 config 中的 sqlalchemy.url（configparser 插值要求 % 转义为 %%）
+    config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
