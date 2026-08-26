@@ -26,6 +26,7 @@ export const en = {
     settings: 'Settings',
     openSettings: 'Open settings',
     skills: 'Skills',
+    artifacts: 'Artifacts',
     langLabel: 'Language',
     themeLabel: 'Theme',
     themeLight: 'Light',
@@ -100,5 +101,11 @@ export const en = {
     installFailed: 'Install failed',
     uninstallDone: 'Uninstalled {name}',
     uninstallFailed: 'Uninstall failed'
+  },
+  artifacts: {
+    title: 'Artifacts',
+    onlyCurrent: 'Current conversation only',
+    download: 'Download',
+    empty: 'No artifacts yet'
   }
 }

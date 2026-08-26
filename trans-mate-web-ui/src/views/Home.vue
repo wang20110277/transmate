@@ -40,6 +40,9 @@
           <button class="settings-entry-btn" :title="t('home.skills')" :aria-label="t('home.skills')" @click="goSkills">
             <i class="fas fa-puzzle-piece"></i>
           </button>
+          <button class="settings-entry-btn" :title="t('home.artifacts')" :aria-label="t('home.artifacts')" @click="openArtifacts">
+            <i class="fas fa-box-open"></i>
+          </button>
         </div>
 
         <!-- 偏好浮层：语言 / 主题 / 连接 -->
@@ -162,6 +165,25 @@
         />
       </div>
     </main>
+
+    <!-- 制品抽屉：查看/下载助手保存的产物文件 -->
+    <el-drawer v-model="artifactsVisible" :title="t('artifacts.title')" size="360px">
+      <el-checkbox v-model="onlyCurrentConversation" @change="loadArtifacts">
+        {{ t('artifacts.onlyCurrent') }}
+      </el-checkbox>
+      <div v-loading="artifactsLoading" class="artifact-list">
+        <div v-for="a in artifacts" :key="a.id" class="artifact-row">
+          <div class="artifact-info">
+            <div class="artifact-name">{{ a.filename }}</div>
+            <div class="artifact-meta">{{ formatSize(a.size) }} · {{ a.created_at }}</div>
+          </div>
+          <el-button size="small" type="primary" plain @click="downloadArtifact(a)">
+            {{ t('artifacts.download') }}
+          </el-button>
+        </div>
+        <el-empty v-if="!artifactsLoading && artifacts.length === 0" :description="t('artifacts.empty')" />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -175,6 +197,7 @@ import MessageList from '../components/agent/MessageList.vue';
 import ChatInput from '../components/agent/ChatInput.vue';
 import { useAgentChat } from '@/composables/useAgentChat';
 import { transcribeAudio, synthesizeSpeech } from '@/services/api';
+import { listArtifacts, getArtifactDownloadUrl, type ArtifactItem } from '@/services/artifacts';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -401,6 +424,40 @@ const goSettings = () => { router.push('/settings'); };
 
 const goSkills = () => { router.push('/skills'); };
 
+// ===== 制品面板（助手保存的产物文件）=====
+const artifactsVisible = ref<boolean>(false);
+const artifactsLoading = ref<boolean>(false);
+const artifacts = ref<ArtifactItem[]>([]);
+const onlyCurrentConversation = ref<boolean>(true);
+
+const openArtifacts = () => {
+  artifactsVisible.value = true;
+  loadArtifacts();
+};
+
+const loadArtifacts = async () => {
+  if (!userId.value) return;
+  artifactsLoading.value = true;
+  try {
+    const convId = onlyCurrentConversation.value ? currentConversationId.value : undefined;
+    const data = await listArtifacts(userId.value, convId ?? undefined);
+    artifacts.value = data.items;
+  } finally {
+    artifactsLoading.value = false;
+  }
+};
+
+const downloadArtifact = async (a: ArtifactItem) => {
+  const url = await getArtifactDownloadUrl(a.id, userId.value);
+  window.open(url, '_blank');
+};
+
+const formatSize = (bytes: number): string => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
+};
+
 const sendMessage = () => {
   const text = newMessage.value;
   if (!text.trim()) return;
@@ -593,6 +650,48 @@ onUnmounted(() => {
 .home-layout .settings-entry-btn:hover {
   color: var(--color-text);
   background: var(--color-hover);
+}
+
+/* ===== 制品抽屉（teleport 到 body，使用全局类名与主题 tokens） ===== */
+.artifact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 120px;
+}
+
+.artifact-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.artifact-info {
+  min-width: 0;
+}
+
+.artifact-name {
+  font-size: 13px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifact-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== 偏好浮层（语言/主题/连接） ===== */

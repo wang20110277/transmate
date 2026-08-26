@@ -26,6 +26,7 @@ export const zh = {
     settings: '设置',
     openSettings: '打开设置',
     skills: '技能',
+    artifacts: '制品',
     langLabel: '界面语言',
     themeLabel: '界面主题',
     themeLight: '浅色',
@@ -100,5 +101,11 @@ export const zh = {
     installFailed: '安装失败',
     uninstallDone: '已卸载 {name}',
     uninstallFailed: '卸载失败'
+  },
+  artifacts: {
+    title: '制品',
+    onlyCurrent: '只看当前会话',
+    download: '下载',
+    empty: '暂无制品，完成任务后由助手保存'
   }
 }
