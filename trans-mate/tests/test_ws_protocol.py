@@ -47,7 +47,7 @@ def test_ws_full_flow_with_auto_conversation(client):
     async def fake_stream(history, thread_id):
         seen_threads.append(thread_id)
         yield {"type": "status", "message": "正在分析意图..."}
-        yield {"type": "agent_start", "agent": "base_agent"}
+        yield {"type": "agent_start", "agent": "deep_agent"}
         yield {"type": "token", "content": f"收到{len(history)}条历史。"}
         yield {"type": "tool_call", "id": "t1", "name": "get_weather", "args": {"city": "北京"}}
         yield {"type": "tool_result", "id": "t1", "name": "get_weather", "result": "北京晴"}

@@ -52,6 +52,10 @@ async def stream_agent_events(
                 for tool_event in tool_events:
                     if tool_event["id"] == event["id"]:
                         tool_event["result"] = result
+            elif kind == "subagent_end":
+                # 子智能体结果同样截断，与 tool_result 策略一致
+                if event.get("result") is not None:
+                    event["result"] = _truncate(str(event["result"]))
 
             yield event
 

@@ -90,6 +90,23 @@ async def test_streaming_tool_result_truncated(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_streaming_subagent_end_result_truncated(monkeypatch):
+    stub = StubHarness(
+        [
+            {"type": "subagent_start", "name": "stock_data_expert", "task": "查行情"},
+            {"type": "subagent_end", "name": "stock_data_expert", "result": "长" * 3000},
+        ]
+    )
+    monkeypatch.setattr(streaming, "get_agent_harness", stub_factory(stub))
+
+    events = [e async for e in stream_agent_events([HumanMessage(content="q")], "conv-1")]
+    result = events[1]["result"]
+    assert len(result) == streaming.MAX_TOOL_RESULT_LENGTH + len("...(截断)")
+    assert result.endswith("...(截断)")
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_streaming_exception_yields_error(monkeypatch):
     class BrokenHarness:
         async def astream(self, history, thread_id):
