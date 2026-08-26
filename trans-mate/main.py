@@ -99,7 +99,9 @@ async def run_agent_stream(
         history = build_history_messages(records)
 
         conversation = chat_service.get_conversation(db, conversation_id)
-        user_id = conversation.user_id if conversation else None
+        # "anonymous" 是 WS 未携带 user_id 时的占位,保持传统路径(非工作区)
+        conv_user = conversation.user_id if conversation else None
+        user_id = conv_user if conv_user and conv_user != "anonymous" else None
         async for event in stream_agent_events(history, f"conv-{conversation_id}", user_id=user_id):
             if event["type"] == "done":
                 chat_service.add_message(
