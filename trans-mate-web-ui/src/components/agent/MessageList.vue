@@ -2,6 +2,18 @@
   <div class="message-list" ref="listContainer">
     <template v-for="(message, index) in messages" :key="index">
       <div :class="['message', 'role-' + (message.role || 'system')]">
+        <!-- 任务计划面板（deep agent todos） -->
+        <TodoPanel
+          v-if="message.role === 'assistant' && message.todos && message.todos.length"
+          :todos="message.todos"
+        />
+
+        <!-- 子智能体运行徽标 -->
+        <div v-if="message.activeSubagent" class="subagent-badge">
+          <span class="mini-spinner"></span>
+          <span>{{ t('chat.subagentWorking', { agent: message.activeSubagent }) }}</span>
+        </div>
+
         <!-- 工具调用块（ZCode 式折叠面板） -->
         <div v-if="message.toolCalls && message.toolCalls.length" class="tool-blocks">
           <ToolCallBlockView
@@ -85,6 +97,7 @@ import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/github.css'
 import ToolCallBlockView from './ToolCallBlockView.vue'
+import TodoPanel from './TodoPanel.vue'
 import { formatTime } from '@/utils/time-utils'
 import { useI18n } from '@/i18n'
 import type { Message } from '@/types'
@@ -405,5 +418,29 @@ onMounted(scrollToBottom)
 .processing-text {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+/* 子智能体运行徽标 */
+.subagent-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--color-primary);
+}
+
+.mini-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(37, 99, 235, 0.25);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -3,7 +3,7 @@
     <div class="tool-header" @click="expanded = !expanded">
       <i :class="expanded ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="chevron"></i>
       <i class="fas fa-toolbox tool-icon"></i>
-      <span class="tool-name">{{ tool.name }}</span>
+      <span class="tool-name">{{ displayName }}</span>
       <span v-if="tool.running" class="tool-status running-status">
         <span class="mini-spinner"></span>
         {{ t('chat.toolRunning') }}
@@ -39,6 +39,15 @@ const { t } = useI18n()
 const props = defineProps<{ tool: ToolCallBlock }>()
 
 const expanded = ref(false)
+
+// 内置工具显示友好名（write_todos/task 已有专用 UI，避免暴露内部工具名）
+const displayName = computed(() => {
+  const map: Record<string, string> = {
+    write_todos: t('chat.toolNameTodos'),
+    task: t('chat.toolNameTask')
+  }
+  return map[props.tool.name] || props.tool.name
+})
 
 const argsText = computed(() => {
   const args = props.tool.args
