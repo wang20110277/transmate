@@ -44,7 +44,7 @@ def test_ws_full_flow_with_auto_conversation(client):
 
     seen_threads = []
 
-    async def fake_stream(history, thread_id):
+    async def fake_stream(history, thread_id, user_id=None):
         seen_threads.append(thread_id)
         yield {"type": "status", "message": "正在分析意图..."}
         yield {"type": "agent_start", "agent": "deep_agent"}
@@ -102,7 +102,7 @@ def test_ws_stop_generation(client):
     test_client, engine = client
     import asyncio
 
-    async def slow_stream(history, thread_id):
+    async def slow_stream(history, thread_id, user_id=None):
         yield {"type": "token", "content": "开始回答"}
         await asyncio.sleep(60)
         yield {"type": "done", "content": "不该到达"}
@@ -132,7 +132,7 @@ def test_ws_plain_text_compat(client):
     """纯文本消息应被兼容解析为 chat_message"""
     test_client, engine = client
 
-    async def fake_stream(history, thread_id):
+    async def fake_stream(history, thread_id, user_id=None):
         yield {"type": "token", "content": "ok"}
         yield {"type": "done", "content": "ok"}
 

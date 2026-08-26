@@ -15,7 +15,7 @@ class StubHarness:
         self.events = events
         self.received = None
 
-    async def astream(self, history, thread_id):
+    async def astream(self, history, thread_id, user_id=None):
         self.received = (list(history), thread_id)
         for event in self.events:
             yield event
@@ -109,7 +109,7 @@ async def test_streaming_subagent_end_result_truncated(monkeypatch):
 @pytest.mark.unit
 async def test_streaming_exception_yields_error(monkeypatch):
     class BrokenHarness:
-        async def astream(self, history, thread_id):
+        async def astream(self, history, thread_id, user_id=None):
             yield {"type": "token", "content": "部分"}
             raise RuntimeError("LLM 炸了")
 

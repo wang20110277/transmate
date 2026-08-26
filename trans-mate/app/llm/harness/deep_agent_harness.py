@@ -5,11 +5,13 @@ DeepAgentHarness：基于 deepagents 的 agent harness 实现
 """
 import logging
 import os
+from collections import OrderedDict
 from typing import Any, AsyncGenerator, List, Optional
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from sqlalchemy.orm import Session
 
 from app.core.config import (
     CHECKPOINT_DB_PATH,
@@ -56,6 +58,10 @@ MAIN_AGENT_PROMPT = """你是 TransMate 智能助手，帮助用户完成资料�
 - 需要实时网络信息时调用 web_search；天气查询调用 get_weather
 - 涉及股票、指数、基金、行情、财务指标、估值等数据时，通过 task 工具派发 stock_data_expert 子智能体采集
 - 复杂多步骤任务先用 write_todos 制定计划，并随进展更新计划状态
+
+用户工作区（启用时）：
+- 你的文件操作限制在当前用户的工作沙箱内；当前会话的工作目录是 sessions/{会话ID}/，用户其他会话的成果在 sessions/ 的兄弟目录中，可以直接引用
+- /skills/ 是已安装技能库（只读，禁止写入）：任务匹配某技能时，先 read_file 读取其 SKILL.md（limit=1000）并按其指引执行
 """
 
 # stock 子智能体提示（迁移自 app/llm/agents/stock_agent.py）
@@ -80,6 +86,25 @@ STOCK_TOOLS = [
     search_stock,
 ]
 
+AGENT_CACHE_SIZE = 8  # 每用户 agent 实例 LRU 上限
+
+
+def _build_backend(user_id: str):
+    """用户工作区后端:默认路由=用户沙箱(防越界),/skills/=技能物化缓存"""
+    from app.core import config
+
+    from deepagents.backends.composite import CompositeBackend
+    from deepagents.backends.filesystem import FilesystemBackend
+
+    sandbox = os.path.join(config.SANDBOX_ROOT, user_id)
+    os.makedirs(sandbox, exist_ok=True)
+    skill_cache = os.path.join(config.SKILL_CACHE_ROOT, user_id)
+    os.makedirs(skill_cache, exist_ok=True)
+    return CompositeBackend(
+        default=FilesystemBackend(root_dir=sandbox, virtual_mode=True),
+        routes={"/skills/": FilesystemBackend(root_dir=skill_cache, virtual_mode=True)},
+    )
+
 
 def _build_model():
     """创建共享 BaseChatModel（Qwen OpenAI 兼容接口，配置与 ModelPool 相同）"""
@@ -102,12 +127,12 @@ def _build_stock_subagent() -> dict:
     }
 
 
-def _build_agent(model, checkpointer):
-    """组装 deepagents 主智能体（deepagents 懒导入，避免模块导入期拉起依赖）"""
+def _build_agent(model, checkpointer, user_id: str | None = None):
+    """组装 deepagents 主智能体;user_id 非空时启用云工作区(skills+沙箱)"""
     from deepagents import create_deep_agent
     from langchain.agents.middleware import TodoListMiddleware
 
-    return create_deep_agent(
+    kwargs = dict(
         model=model,
         tools=[search_knowledge_base, get_weather, web_search],
         system_prompt=MAIN_AGENT_PROMPT,
@@ -116,6 +141,10 @@ def _build_agent(model, checkpointer):
         checkpointer=checkpointer,
         name=AGENT_NAME,
     )
+    if user_id is not None:
+        kwargs["skills"] = ["/skills/"]
+        kwargs["backend"] = _build_backend(user_id)
+    return create_deep_agent(**kwargs)
 
 
 class DeepAgentHarness(AgentHarness):
@@ -136,8 +165,30 @@ class DeepAgentHarness(AgentHarness):
         self._checkpointer: Optional[BaseCheckpointSaver] = None
         self._agent: Any = None
         self._model: Any = None
+        self._user_agents: "OrderedDict[str, Any]" = OrderedDict()
         self._saver_cm = None
         self._initialized = False
+
+    def _resolve_agent(self, user_id: Optional[str], db: Session | None):
+        """user_id 为空 → 传统单例 agent;否则按用户工厂缓存取"""
+        if user_id is None:
+            return self._agent
+        return self._get_agent_for_user(user_id, db)
+
+    def _get_agent_for_user(self, user_id: str, db: Session | None):
+        from app.llm.harness.skill_materializer import sync_user_skills
+
+        if user_id in self._user_agents:
+            self._user_agents.move_to_end(user_id)
+            return self._user_agents[user_id]
+        # 物化失败降级为空缓存目录,不阻塞对话(spec §5)
+        sync_user_skills(db, user_id)
+        model = self._model or _build_model()
+        agent = _build_agent(model, self._checkpointer, user_id=user_id)
+        self._user_agents[user_id] = agent
+        while len(self._user_agents) > AGENT_CACHE_SIZE:
+            self._user_agents.popitem(last=False)
+        return agent
 
     async def initialize(self) -> None:
         """初始化重量级资源（测试注入模式跳过真实组件构造）"""
@@ -174,6 +225,7 @@ class DeepAgentHarness(AgentHarness):
                 self._saver_cm = None
                 self._checkpointer = None
                 self._agent = None
+                self._user_agents.clear()
                 self._initialized = False
 
     async def clear_thread(self, thread_id: str) -> None:
@@ -186,18 +238,33 @@ class DeepAgentHarness(AgentHarness):
             logger.warning(f"清除会话 checkpoint 失败 thread={thread_id}: {exc}")
 
     async def astream(
-        self, history: List[BaseMessage], thread_id: str
+        self,
+        history: List[BaseMessage],
+        thread_id: str,
+        user_id: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
-        """驱动 agent 一轮：产出归一化事件（第一个事件前补 agent_start）"""
+        """驱动 agent 一轮：产出归一化事件（第一个事件前补 agent_start）
+
+        user_id 非空时启用该用户的云工作区 agent（沙箱+技能库）。
+        """
         await self.initialize()
         config = {"configurable": {"thread_id": thread_id}}
         messages = await self._resolve_input_messages(history, config)
 
+        db = None
+        try:
+            if user_id is not None:
+                from app.core.database import SessionLocal
+
+                db = SessionLocal()
+            agent = self._resolve_agent(user_id, db)
+        finally:
+            if db is not None:
+                db.close()
+
         started = False
         state: dict = {}
-        async for raw in self._agent.astream_events(
-            {"messages": messages}, config, version="v2"
-        ):
+        async for raw in agent.astream_events({"messages": messages}, config, version="v2"):
             if not started:
                 started = True
                 yield {"type": EVENT_AGENT_START, "agent": AGENT_NAME}

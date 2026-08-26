@@ -22,7 +22,7 @@ def _truncate(text: str, limit: int = MAX_TOOL_RESULT_LENGTH) -> str:
 
 
 async def stream_agent_events(
-    history: List[BaseMessage], thread_id: str
+    history: List[BaseMessage], thread_id: str, user_id: str | None = None
 ) -> AsyncGenerator[dict, None]:
     """
     驱动 agent harness 执行一轮并聚合事件。
@@ -39,7 +39,7 @@ async def stream_agent_events(
     tool_events: List[dict] = []
 
     try:
-        async for event in get_agent_harness().astream(history, thread_id):
+        async for event in get_agent_harness().astream(history, thread_id, user_id=user_id):
             kind = event.get("type")
 
             if kind == "token":

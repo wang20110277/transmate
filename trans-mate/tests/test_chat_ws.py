@@ -35,7 +35,7 @@ class StubHarness:
         self.threads = []
         self.cleared = []
 
-    async def astream(self, history, thread_id):
+    async def astream(self, history, thread_id, user_id=None):
         self.threads.append(thread_id)
         yield {"type": "agent_start", "agent": "deep_agent"}
         yield {"type": "token", "content": "好的"}

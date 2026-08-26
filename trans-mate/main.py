@@ -98,7 +98,9 @@ async def run_agent_stream(
         records = chat_service.list_messages(db, conversation_id, limit=20)
         history = build_history_messages(records)
 
-        async for event in stream_agent_events(history, f"conv-{conversation_id}"):
+        conversation = chat_service.get_conversation(db, conversation_id)
+        user_id = conversation.user_id if conversation else None
+        async for event in stream_agent_events(history, f"conv-{conversation_id}", user_id=user_id):
             if event["type"] == "done":
                 chat_service.add_message(
                     db,
