@@ -95,3 +95,31 @@ def test_parse_skill_md_valid_and_invalid():
     assert ok["name"] == "demo"
     assert skill_service.parse_skill_md("没有 frontmatter", "x") is None
     assert skill_service.parse_skill_md("---\nname: bad\n---\n", "other") is None
+
+
+@pytest.mark.unit
+def test_list_registry_skips_dirs_without_skill_md(monkeypatch):
+    def _handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/contents/"):
+            return httpx.Response(200, json=[
+                {"name": ".github", "path": ".github", "type": "dir"},
+                {"name": "ok-skill", "path": "ok-skill", "type": "dir"},
+            ], request=request)
+        if path.endswith("/.github/SKILL.md"):
+            return httpx.Response(404, request=request)
+        # 注:需带 /contents/ 前缀,否则 raw 下载请求(/ok-skill/SKILL.md)会误命中本分支
+        if path.endswith("/contents/ok-skill/SKILL.md"):
+            return httpx.Response(200, json=[{
+                "name": "SKILL.md", "path": "ok-skill/SKILL.md", "type": "file", "size": 10,
+                "download_url": "https://raw.test/ok-skill/SKILL.md",
+            }], request=request)
+        if "raw.test" in str(request.url):
+            return httpx.Response(200, text=(
+                "---\nname: ok-skill\ndescription: 有效技能\n---\n# OK\n"
+            ), request=request)
+        return httpx.Response(404, request=request)
+
+    monkeypatch.setattr(skill_service, "_registry_transport", httpx.MockTransport(_handler))
+    items = list_registry()
+    assert [i["name"] for i in items] == ["ok-skill"]

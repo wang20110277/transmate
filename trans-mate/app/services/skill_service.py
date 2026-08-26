@@ -105,8 +105,15 @@ def _fetch_json(client: httpx.Client, path: str):
 
 
 def _fetch_skill_md(client: httpx.Client, dir_path: str) -> Optional[str]:
-    """下载技能目录下 SKILL.md 原文;404 返回 None"""
-    listing = _fetch_json(client, f"/contents/{dir_path}/SKILL.md")
+    """下载技能目录下 SKILL.md 原文;目录无 SKILL.md(404)返回 None 跳过"""
+    response = client.get(f"/contents/{dir_path}/SKILL.md")
+    if response.status_code == 404:
+        return None
+    if response.status_code != 200:
+        raise SkillServiceError(
+            f"GitHub API 请求失败 /contents/{dir_path}/SKILL.md: HTTP {response.status_code}"
+        )
+    listing = response.json()
     if isinstance(listing, list):
         listing = listing[0]
     download_url = listing.get("download_url")
@@ -119,7 +126,7 @@ def _fetch_skill_md(client: httpx.Client, dir_path: str) -> Optional[str]:
 
 
 def list_registry(force: bool = False) -> list[SkillRegistryItem]:
-    """列出仓库技能目录(TTL 缓存降级:失败时若缓存未过期返回旧值)"""
+    """列出仓库技能目录(TTL 缓存降级:失败时若存在旧值则返回旧值)"""
     cached = _registry_cache.get("items")
     if not force and cached and time.time() - cached[0] < SKILL_REGISTRY_CACHE_TTL:
         return cached[1]
