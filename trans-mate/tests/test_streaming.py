@@ -1,154 +1,104 @@
 """
-流式事件服务单元测试：验证 LangChain 事件到 WebSocket 事件协议的转换
+流式事件服务单元测试：harness 事件到 WebSocket 事件协议的聚合
 """
 import pytest
-from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.llm import streaming
 from app.llm.streaming import stream_agent_events, build_history_messages
 
 
-class StubGraph:
-    """伪造 agent_router，回放预设的 astream_events 事件"""
+class StubHarness:
+    """伪造 harness：回放预设事件，记录收到的 history 与 thread_id"""
 
     def __init__(self, events):
         self.events = events
-        self.received_input = None
+        self.received = None
 
-    async def astream_events(self, input_data, version=None):
-        self.received_input = input_data
+    async def astream(self, history, thread_id):
+        self.received = (list(history), thread_id)
         for event in self.events:
             yield event
 
 
-def chain_start(name):
-    return {"event": "on_chain_start", "name": name, "data": {}, "run_id": f"s-{name}"}
+def stub_factory(harness):
+    return lambda: harness
 
 
-def token_event(text):
-    return {
-        "event": "on_chat_model_stream",
-        "name": "ChatOpenAI",
-        "data": {"chunk": AIMessageChunk(content=text)},
-        "run_id": "m1",
-    }
-
-
-@pytest.mark.unit
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_streaming_token_flow(monkeypatch):
-    stub = StubGraph(
+    stub = StubHarness(
         [
-            chain_start("classifier"),
-            chain_start("base_agent"),
-            token_event("你"),
-            token_event("好"),
-            {
-                "event": "on_chain_end",
-                "name": "base_agent",
-                "data": {"output": {"messages": [AIMessage(content="你好")]}},
-                "run_id": "s-base_agent",
-            },
+            {"type": "agent_start", "agent": "deep_agent"},
+            {"type": "token", "content": "你"},
+            {"type": "token", "content": "好"},
         ]
     )
-    monkeypatch.setattr(streaming, "agent_router", stub)
+    monkeypatch.setattr(streaming, "get_agent_harness", stub_factory(stub))
 
-    events = [event async for event in stream_agent_events([HumanMessage(content="hi")])]
+    history = [HumanMessage(content="hi")]
+    events = [e async for e in stream_agent_events(history, "conv-1")]
 
-    assert [e["type"] for e in events] == ["status", "agent_start", "token", "token", "done"]
-    assert events[0]["message"] == "正在分析意图..."
-    assert events[1]["agent"] == "base_agent"
-    assert events[2]["content"] == "你"
+    assert [e["type"] for e in events] == ["agent_start", "token", "token", "done"]
     assert events[-1]["content"] == "你好"
-    assert stub.received_input == {"messages": [HumanMessage(content="hi")]}
+    assert stub.received == ([HumanMessage(content="hi")], "conv-1")
 
 
-@pytest.mark.unit
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_streaming_tool_call_pairing(monkeypatch):
-    stub = StubGraph(
+    stub = StubHarness(
         [
-            chain_start("base_agent"),
-            token_event("我先查一下"),
-            {
-                "event": "on_tool_start",
-                "name": "get_weather",
-                "run_id": "tool-1",
-                "data": {"input": {"city": "北京"}},
-            },
-            {
-                "event": "on_tool_end",
-                "name": "get_weather",
-                "run_id": "tool-1",
-                "data": {"output": "北京晴，25度"},
-            },
-            token_event("查询完成"),
-            {
-                "event": "on_chain_end",
-                "name": "base_agent",
-                "data": {"output": {"messages": [AIMessage(content="最终回复")]}},
-                "run_id": "s-base_agent",
-            },
+            {"type": "agent_start", "agent": "deep_agent"},
+            {"type": "token", "content": "我先查一下"},
+            {"type": "tool_call", "id": "t1", "name": "get_weather", "args": {"city": "北京"}},
+            {"type": "tool_result", "id": "t1", "name": "get_weather", "result": "北京晴，25度"},
+            {"type": "token", "content": "查询完成"},
         ]
     )
-    monkeypatch.setattr(streaming, "agent_router", stub)
+    monkeypatch.setattr(streaming, "get_agent_harness", stub_factory(stub))
 
-    events = [event async for event in stream_agent_events([HumanMessage(content="北京天气")])]
+    events = [e async for e in stream_agent_events([HumanMessage(content="北京天气")], "conv-1")]
 
     types = [e["type"] for e in events]
     assert types == ["agent_start", "token", "tool_call", "tool_result", "token", "done"]
 
-    tool_call = events[2]
-    assert tool_call["name"] == "get_weather"
-    assert tool_call["args"] == {"city": "北京"}
-
-    tool_result = events[3]
-    assert tool_result["id"] == "tool-1"
-    assert tool_result["result"] == "北京晴，25度"
-
-    # done 事件中的 tool_events 应带上结果
     done = events[-1]
-    assert done["content"] == "最终回复"
+    assert done["content"] == "我先查一下查询完成"
     assert done["tool_events"][0]["result"] == "北京晴，25度"
+    # tool_result 事件本身也要透传给前端
+    assert events[3]["result"] == "北京晴，25度"
 
 
-@pytest.mark.unit
 @pytest.mark.asyncio
-async def test_streaming_non_streaming_path_catchup(monkeypatch):
-    """RAG 直接命中（无 token 事件）时应补发完整内容"""
-    stub = StubGraph(
+@pytest.mark.unit
+async def test_streaming_tool_result_truncated(monkeypatch):
+    stub = StubHarness(
         [
-            chain_start("rag_retrieval"),
-            chain_start("rag_agent"),
-            {
-                "event": "on_chain_end",
-                "name": "rag_agent",
-                "data": {"output": {"messages": [AIMessage(content="知识库答案")]}},
-                "run_id": "s-rag_agent",
-            },
+            {"type": "tool_call", "id": "t1", "name": "web_search", "args": {"q": "x"}},
+            {"type": "tool_result", "id": "t1", "name": "web_search", "result": "长" * 3000},
         ]
     )
-    monkeypatch.setattr(streaming, "agent_router", stub)
+    monkeypatch.setattr(streaming, "get_agent_harness", stub_factory(stub))
 
-    events = [event async for event in stream_agent_events([HumanMessage(content="问题")])]
-
-    types = [e["type"] for e in events]
-    assert types == ["status", "agent_start", "token", "done"]
-    assert events[2]["content"] == "知识库答案"
-    assert events[-1]["content"] == "知识库答案"
+    events = [e async for e in stream_agent_events([HumanMessage(content="q")], "conv-1")]
+    result = events[1]["result"]
+    assert len(result) == streaming.MAX_TOOL_RESULT_LENGTH + len("...(截断)")
+    assert result.endswith("...(截断)")
 
 
-@pytest.mark.unit
 @pytest.mark.asyncio
+@pytest.mark.unit
 async def test_streaming_exception_yields_error(monkeypatch):
-    class BrokenGraph:
-        async def astream_events(self, input_data, version=None):
-            yield token_event("部分")
+    class BrokenHarness:
+        async def astream(self, history, thread_id):
+            yield {"type": "token", "content": "部分"}
             raise RuntimeError("LLM 炸了")
 
-    monkeypatch.setattr(streaming, "agent_router", BrokenGraph())
+    monkeypatch.setattr(streaming, "get_agent_harness", stub_factory(BrokenHarness()))
 
-    events = [event async for event in stream_agent_events([HumanMessage(content="hi")])]
+    events = [e async for e in stream_agent_events([HumanMessage(content="hi")], "conv-1")]
     assert events[-1]["type"] == "error"
     assert "LLM 炸了" in events[-1]["message"]
 
