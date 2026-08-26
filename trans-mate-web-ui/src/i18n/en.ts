@@ -25,6 +25,7 @@ export const en = {
     prefButton: 'Preferences',
     settings: 'Settings',
     openSettings: 'Open settings',
+    skills: 'Skills',
     langLabel: 'Language',
     themeLabel: 'Theme',
     themeLight: 'Light',
@@ -83,5 +84,21 @@ export const en = {
     toolArgs: 'Arguments',
     toolResult: 'Result',
     toolWaiting: 'Waiting for tool execution...'
+  },
+  skills: {
+    title: 'Skills',
+    refresh: 'Refresh registry',
+    registry: 'Skill Registry',
+    installed: 'Installed',
+    searchPlaceholder: 'Search skills by name or description',
+    install: 'Install',
+    uninstall: 'Uninstall',
+    emptyRegistry: 'Registry is empty or unreachable — try refreshing',
+    emptyInstalled: 'No skills installed yet',
+    loadFailed: 'Failed to load skills',
+    installDone: 'Installed {name}',
+    installFailed: 'Install failed',
+    uninstallDone: 'Uninstalled {name}',
+    uninstallFailed: 'Uninstall failed'
   }
 }

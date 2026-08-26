@@ -37,6 +37,9 @@
           <button class="settings-entry-btn" :title="t('home.settings')" :aria-label="t('home.openSettings')" @click="goSettings">
             <i class="fas fa-cog"></i>
           </button>
+          <button class="settings-entry-btn" :title="t('home.skills')" :aria-label="t('home.skills')" @click="goSkills">
+            <i class="fas fa-puzzle-piece"></i>
+          </button>
         </div>
 
         <!-- 偏好浮层：语言 / 主题 / 连接 -->
@@ -395,6 +398,8 @@ watch(userMenuOpen, (open) => {
 });
 
 const goSettings = () => { router.push('/settings'); };
+
+const goSkills = () => { router.push('/skills'); };
 
 const sendMessage = () => {
   const text = newMessage.value;

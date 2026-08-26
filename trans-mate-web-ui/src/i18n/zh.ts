@@ -25,6 +25,7 @@ export const zh = {
     prefButton: '界面偏好',
     settings: '设置',
     openSettings: '打开设置',
+    skills: '技能',
     langLabel: '界面语言',
     themeLabel: '界面主题',
     themeLight: '浅色',
@@ -83,5 +84,21 @@ export const zh = {
     toolArgs: '参数',
     toolResult: '结果',
     toolWaiting: '正在等待工具执行...'
+  },
+  skills: {
+    title: '技能',
+    refresh: '刷新仓库',
+    registry: '技能仓库',
+    installed: '已安装',
+    searchPlaceholder: '搜索技能名称或描述',
+    install: '安装',
+    uninstall: '卸载',
+    emptyRegistry: '仓库为空或不可达，可点击刷新重试',
+    emptyInstalled: '尚未安装任何技能',
+    loadFailed: '加载技能失败',
+    installDone: '已安装 {name}',
+    installFailed: '安装失败',
+    uninstallDone: '已卸载 {name}',
+    uninstallFailed: '卸载失败'
   }
 }
