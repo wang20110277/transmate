@@ -4,6 +4,7 @@ DeepAgentHarness：基于 deepagents 的 agent harness 实现
 通过 AsyncSqliteSaver 按 thread 持久化 agent 内部状态
 """
 import logging
+import os
 from typing import Any, AsyncGenerator, List, Optional
 
 from langchain.chat_models import init_chat_model
@@ -151,6 +152,10 @@ class DeepAgentHarness(AgentHarness):
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
         self._model = self._model_param or _build_model()
+        # 全新环境 store/ 目录可能不存在（git-ignored），先确保目录存在
+        checkpoint_dir = os.path.dirname(CHECKPOINT_DB_PATH)
+        if checkpoint_dir:
+            os.makedirs(checkpoint_dir, exist_ok=True)
         self._saver_cm = AsyncSqliteSaver.from_conn_string(CHECKPOINT_DB_PATH)
         self._checkpointer = await self._saver_cm.__aenter__()
         await self._checkpointer.setup()
