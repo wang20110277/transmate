@@ -29,7 +29,7 @@ def make_sqlite_engine(memory_shared: bool = True):
 
 
 @pytest.fixture
-def db():
+def db(monkeypatch):
     """chat_service 单测用的独立内存库会话"""
     from app.models.user import User  # noqa: F401
     from app.models.conversation import Conversation, ChatMessage  # noqa: F401
@@ -37,6 +37,12 @@ def db():
 
     engine = make_sqlite_engine()
     Base.metadata.create_all(engine)
+    # 运行期懒导入 SessionLocal 的代码(如 save_artifact 工具)也落到同一测试库,
+    # 避免误连开发库;import 时已绑定 SessionLocal 的模块(main.py 等)不受影响
+    monkeypatch.setattr(
+        "app.core.database.SessionLocal",
+        sessionmaker(bind=engine, autocommit=False, autoflush=False),
+    )
     Session = sessionmaker(bind=engine)
     session = Session()
     yield session

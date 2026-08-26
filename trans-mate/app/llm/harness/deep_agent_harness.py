@@ -62,6 +62,7 @@ MAIN_AGENT_PROMPT = """你是 TransMate 智能助手，帮助用户完成资料�
 用户工作区（启用时）：
 - 你的文件操作限制在当前用户的工作沙箱内；当前会话的工作目录是 sessions/{会话ID}/，用户其他会话的成果在 sessions/ 的兄弟目录中，可以直接引用
 - /skills/ 是已安装技能库（只读，禁止写入）：任务匹配某技能时，先 read_file 读取其 SKILL.md（limit=1000）并按其指引执行
+- 完成可交付成果（如 PPT/PDF/报告/代码包等文件）后，调用 save_artifact 将其保存为制品，供用户随时跨设备下载
 """
 
 # stock 子智能体提示（迁移自 app/llm/agents/stock_agent.py）
@@ -142,8 +143,11 @@ def _build_agent(model, checkpointer, user_id: str | None = None):
         name=AGENT_NAME,
     )
     if user_id is not None:
+        from app.llm.tools.artifact_tool import make_save_artifact_tool
+
         kwargs["skills"] = ["/skills/"]
         kwargs["backend"] = _build_backend(user_id)
+        kwargs["tools"] = kwargs["tools"] + [make_save_artifact_tool(user_id)]
     return create_deep_agent(**kwargs)
 
 
