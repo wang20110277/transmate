@@ -1341,10 +1341,14 @@ def captured(monkeypatch, tmp_path, db):
     monkeypatch.setattr(dah, "AGENT_CACHE_SIZE", 2)
     monkeypatch.setattr("app.core.config.SANDBOX_ROOT", str(tmp_path / "sandbox"))
     monkeypatch.setattr("app.core.config.SKILL_CACHE_ROOT", str(tmp_path / "cache"))
+    # patch 源模块(_get_agent_for_user 内部从 skill_materializer 导入,patch dah 属性无效)
+    from pathlib import Path
+
+    from app.core import config as app_config
+
     monkeypatch.setattr(
-        dah, "sync_user_skills", lambda db_, uid, **kw: __import__("pathlib").Path(
-            __import__("app.core.config", fromlist=["SKILL_CACHE_ROOT"]).SKILL_CACHE_ROOT, uid
-        )
+        "app.llm.harness.skill_materializer.sync_user_skills",
+        lambda db_, uid, **kw: Path(app_config.SKILL_CACHE_ROOT, uid),
     )
     return captured_calls
 
@@ -1676,7 +1680,7 @@ def test_install_and_uninstall_roundtrip(client):
     listed = client.get("/api/skills/installed", params={"user_id": "u1"}).json()["items"]
     assert [i["name"] for i in listed] == ["demo-skill"]
 
-    reg = client.get("/api/skills/registry").json()["items"][0]
+    reg = client.get("/api/skills/registry/u1").json()["items"][0]
     assert reg["installed"] is True
 
     del_resp = client.delete("/api/skills/demo-skill", params={"user_id": "u1"})
@@ -1779,7 +1783,10 @@ async def list_registry_route():
     """浏览技能仓库(installed 标记需 user_id)"""
     try:
         items = skill_service.list_registry()
-        return RegistryResponse(items=[RegistryItem(**i) for i in items])
+        return RegistryResponse(items=[
+            RegistryItem(name=i["name"], description=i["description"], license=i["license"])
+            for i in items
+        ])
     except SkillServiceError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc
 
@@ -1791,7 +1798,13 @@ async def list_registry_for_user(user_id: str, db: Session = Depends(get_db)):
         items = skill_service.list_registry()
         installed = {r.name for r in skill_service.list_installed(db, user_id)}
         return RegistryResponse(
-            items=[RegistryItem(**i, installed=i["name"] in installed) for i in items]
+            items=[
+                RegistryItem(
+                    name=i["name"], description=i["description"],
+                    license=i["license"], installed=i["name"] in installed,
+                )
+                for i in items
+            ]
         )
     except SkillServiceError as exc:
         raise HTTPException(status_code=502, detail=exc.message) from exc
@@ -2740,7 +2753,12 @@ def workspace(tmp_path, monkeypatch, db):
     db.add(UserSkill(user_id="u1", name="demo-skill", version="v1", description="",
                      source="test"))
     db.commit()
+    # 关键:物化器默认走 _get_storage(),必须注入 FakeStorage 替身,否则直连 MinIO
+    import app.services.skill_service as skill_service
+
+    skill_service._storage_singleton_override = storage
     yield tmp_path, storage
+    skill_service._storage_singleton_override = None
 
 
 class _FakeModel:
