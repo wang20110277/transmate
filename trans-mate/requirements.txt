@@ -48,6 +48,10 @@ sqlalchemy==2.0.45
 pymysql==1.1.1
 psycopg2-binary==2.9.10
 redis==7.1.0
+alembic==1.19.1
+
+#object-storage
+minio==7.2.15
 
 #security
 bcrypt==4.3.0
