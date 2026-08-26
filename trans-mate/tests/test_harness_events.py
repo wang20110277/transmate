@@ -126,3 +126,119 @@ async def test_clear_thread_delegates_to_checkpointer():
     await harness.initialize()
     await harness.clear_thread("conv-9")
     assert spy.deleted == ["conv-9"]
+
+
+def tool_start_event(name, run_id, tool_input, tags=None):
+    return {
+        "event": "on_tool_start",
+        "name": name,
+        "tags": tags or [],
+        "run_id": run_id,
+        "data": {"input": tool_input},
+    }
+
+
+def tool_end_event(name, run_id, output, tags=None):
+    return {
+        "event": "on_tool_end",
+        "name": name,
+        "tags": tags or [],
+        "run_id": run_id,
+        "data": {"output": output},
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_write_todos_emits_plan_update():
+    stub = StubAgent(
+        [
+            tool_start_event(
+                "write_todos",
+                "t1",
+                {"todos": [{"content": "查天气", "status": "pending"}]},
+            ),
+            tool_end_event("write_todos", "t1", "已更新"),
+        ]
+    )
+    harness = DeepAgentHarness(agent=stub, checkpointer=None)
+    out = [e async for e in harness.astream([HumanMessage(content="计划")], "conv-1")]
+
+    types = [e["type"] for e in out]
+    assert types == [
+        "agent_start",
+        "status",
+        "plan_update",
+        "tool_call",
+        "tool_result",
+    ]
+    plan = out[2]
+    assert plan["todos"] == [{"content": "查天气", "status": "pending"}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_task_tool_emits_subagent_events():
+    stub = StubAgent(
+        [
+            tool_start_event(
+                "task",
+                "t2",
+                {"subagent_type": "stock_data_expert", "description": "查茅台日线"},
+            ),
+            tool_end_event("task", "t2", "日线数据已取回"),
+        ]
+    )
+    harness = DeepAgentHarness(agent=stub, checkpointer=None)
+    out = [e async for e in harness.astream([HumanMessage(content="茅台行情")], "conv-1")]
+
+    types = [e["type"] for e in out]
+    assert types == [
+        "agent_start",
+        "status",
+        "subagent_start",
+        "tool_call",
+        "subagent_end",
+        "tool_result",
+    ]
+    sub_start = out[2]
+    assert sub_start["name"] == "stock_data_expert"
+    assert sub_start["task"] == "查茅台日线"
+    sub_end = out[4]
+    assert sub_end["name"] == "stock_data_expert"
+    assert "日线数据已取回" in sub_end["result"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_subagent_tokens_filtered():
+    """子智能体的 LLM token 不进入主回复流，主智能体 token 正常透传"""
+    stub = StubAgent(
+        [
+            token_event("主"),
+            token_event("子", tags=["stock_data_expert"]),
+            token_event("答"),
+        ]
+    )
+    harness = DeepAgentHarness(agent=stub, checkpointer=None)
+    out = [e async for e in harness.astream([HumanMessage(content="hi")], "conv-1")]
+    tokens = [e["content"] for e in out if e["type"] == "token"]
+    assert tokens == ["主", "答"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_normal_tool_keeps_protocol():
+    stub = StubAgent(
+        [
+            tool_start_event("get_weather", "t3", {"city": "北京"}),
+            tool_end_event("get_weather", "t3", "北京晴"),
+        ]
+    )
+    harness = DeepAgentHarness(agent=stub, checkpointer=None)
+    out = [e async for e in harness.astream([HumanMessage(content="北京天气")], "conv-1")]
+
+    types = [e["type"] for e in out]
+    assert types == ["agent_start", "status", "tool_call", "tool_result"]
+    assert out[2]["args"] == {"city": "北京"}
+    assert out[3]["result"] == "北京晴"

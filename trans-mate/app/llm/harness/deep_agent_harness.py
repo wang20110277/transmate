@@ -20,7 +20,10 @@ from app.core.config import (
 from app.llm.harness.base import AgentHarness
 from app.llm.harness.events import (
     EVENT_AGENT_START,
+    EVENT_PLAN_UPDATE,
     EVENT_STATUS,
+    EVENT_SUBAGENT_END,
+    EVENT_SUBAGENT_START,
     EVENT_TOKEN,
     EVENT_TOOL_CALL,
     EVENT_TOOL_RESULT,
@@ -186,13 +189,14 @@ class DeepAgentHarness(AgentHarness):
         messages = await self._resolve_input_messages(history, config)
 
         started = False
+        state: dict = {}
         async for raw in self._agent.astream_events(
             {"messages": messages}, config, version="v2"
         ):
             if not started:
                 started = True
                 yield {"type": EVENT_AGENT_START, "agent": AGENT_NAME}
-            for event in self._adapt_event(raw, {}):
+            for event in self._adapt_event(raw, state):
                 yield event
 
     async def _resolve_input_messages(
@@ -210,12 +214,20 @@ class DeepAgentHarness(AgentHarness):
         return list(history)
 
     def _adapt_event(self, raw: dict, state: dict) -> List[dict]:
-        """原始 astream_events 事件 → 归一化协议事件（0..n 条）"""
+        """原始 astream_events 事件 → 归一化协议事件（0..n 条）
+
+        state 在一轮 astream 内跨调用共享：记录最近派发的子智能体名，
+        供 task 工具结束时回填 subagent_end.name。
+        """
         kind = raw.get("event")
         name = raw.get("name", "")
         data = raw.get("data") or {}
+        tags = set(raw.get("tags") or [])
 
         if kind == "on_chat_model_stream":
+            if tags & SUBAGENT_NAMES:
+                # 子智能体的 token 不进入主回复流
+                return []
             chunk = data.get("chunk")
             content = getattr(chunk, "content", None)
             if isinstance(content, str) and content:
@@ -224,26 +236,69 @@ class DeepAgentHarness(AgentHarness):
 
         if kind == "on_tool_start":
             tool_input = data.get("input")
-            out = [
-                {"type": EVENT_STATUS, "message": f"正在调用工具 {name}..."},
+            out = [{"type": EVENT_STATUS, "message": f"正在调用工具 {name}..."}]
+
+            if name == "write_todos":
+                todos = (tool_input or {}).get("todos", [])
+                out.append(
+                    {
+                        "type": EVENT_PLAN_UPDATE,
+                        "todos": [self._norm_todo(t) for t in todos],
+                    }
+                )
+            elif name == "task":
+                args = tool_input or {}
+                sub_name = str(args.get("subagent_type", ""))
+                task_desc = str(args.get("description", ""))
+                state["last_subagent_name"] = sub_name
+                out.append(
+                    {
+                        "type": EVENT_SUBAGENT_START,
+                        "name": sub_name,
+                        "description": task_desc,
+                        "task": task_desc,
+                    }
+                )
+
+            out.append(
                 {
                     "type": EVENT_TOOL_CALL,
                     "id": raw.get("run_id"),
                     "name": name,
                     "args": tool_input,
-                },
-            ]
+                }
+            )
             return out
 
         if kind == "on_tool_end":
             result = str(data.get("output", ""))
-            return [
+            out = []
+            if name == "task":
+                out.append(
+                    {
+                        "type": EVENT_SUBAGENT_END,
+                        "name": state.get("last_subagent_name", ""),
+                        "result": result,
+                    }
+                )
+            out.append(
                 {
                     "type": EVENT_TOOL_RESULT,
                     "id": raw.get("run_id"),
                     "name": name,
                     "result": result,
                 }
-            ]
+            )
+            return out
 
         return []
+
+    @staticmethod
+    def _norm_todo(todo: Any) -> dict:
+        """归一化 write_todos 的计划项"""
+        if isinstance(todo, dict):
+            return {
+                "content": str(todo.get("content", "")),
+                "status": str(todo.get("status", "pending")),
+            }
+        return {"content": str(todo), "status": "pending"}
