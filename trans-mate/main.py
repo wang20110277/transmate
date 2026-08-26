@@ -19,6 +19,7 @@ from app.base.auth_routes import router as auth_router
 from app.base.chat_routes import router as chat_router
 from app.base.asr_routes import router as asr_router
 from app.base.tts_routes import router as tts_router
+from app.base.skill_routes import router as skill_router
 from app.services import chat_service
 
 logging.basicConfig(
@@ -73,6 +74,7 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(asr_router)
 app.include_router(tts_router)
+app.include_router(skill_router)
 
 
 @app.get("/")
