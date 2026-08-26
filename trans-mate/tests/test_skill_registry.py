@@ -71,8 +71,10 @@ def test_list_registry_uses_ttl_cache(monkeypatch):
     transport = httpx.MockTransport(counting_handler)
     monkeypatch.setattr(skill_service, "_registry_transport", transport)
     list_registry()
-    list_registry()
-    assert calls["n"] == list_registry() and calls["n"] < 10  # 多次调用未按目录数线性增长
+    before = calls["n"]
+    assert before < 10  # 首次调用未按目录数线性膨胀
+    list_registry()  # 第二次调用应命中 TTL 缓存
+    assert calls["n"] == before  # 缓存命中:零新请求
 
 
 @pytest.mark.unit
