@@ -149,10 +149,13 @@ export function useAgentChat(options: UseAgentChatOptions) {
     intentionalClose = false
     connectionStatus.value = 'connecting'
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://'
-    // 浏览器环境用当前域名（走 vite 代理）；Electron file:// 环境 host 为空，回退到直连后端
-    const host = window.location.host
-      || `${import.meta.env.VITE_WS_HOST || 'localhost'}:${import.meta.env.VITE_WS_PORT || '8000'}`
-    const wsUrl = `${protocol}${host}/ws?user_id=${encodeURIComponent(toValue(userId))}`
+    // 连接设置（tm_api_base）优先：http(s) 地址直连切换为 ws(s)
+    const savedBase = localStorage.getItem('tm_api_base')
+    const host = savedBase?.replace(/^http/, 'ws')
+      // 浏览器环境用当前域名（走 vite 代理）；Electron file:// 环境 host 为空，回退到直连后端
+      || `${protocol}${window.location.host
+        || `${import.meta.env.VITE_WS_HOST || 'localhost'}:${import.meta.env.VITE_WS_PORT || '8000'}`}`
+    const wsUrl = `${host}/ws?user_id=${encodeURIComponent(toValue(userId))}`
     socket.value = new WebSocket(wsUrl)
     socket.value.onopen = () => {
       isConnected.value = true
