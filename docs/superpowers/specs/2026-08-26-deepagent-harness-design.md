@@ -60,14 +60,20 @@ class AgentHarness(ABC):
 
 ### 3.3 DeepAgentHarness 组装（deep_agent_harness.py）
 
-- `model=ModelPool()`（duck-type `bind_tools`，与现有 base_agent 用法一致）
+- `model` 用 `init_chat_model`（DEFAULT_* 配置、temperature=0.1）创建共享 `BaseChatModel`
+  实例，主 agent 与 stock 子 agent 共用。**注意**：deepagents 的 `resolve_model` 只接受
+  `BaseChatModel` 或 str，`ModelPool` 自定义包装类不兼容（会走 `init_chat_model`
+  崩溃）——`ModelPool` 保留给已停用的旧 router 路径
 - `tools=[search_knowledge_base, get_weather, web_search]`
   - `search_knowledge_base`：包装 `rag_agent.retrieve`，沿用 15s 超时 +
     `asyncio.to_thread` 保护；超时/异常返回"知识库暂不可用"文案（不抛错，agent
     可转用 web_search）
 - `subagents=[stock_subagent]`：6 个 tushare 工具（get_stock_info /
   get_stock_daily / get_stock_realtime / get_index_daily /
-  get_stock_daily_basic / search_stock）+ 迁移现有 stock_agent 系统提示词
+  get_stock_daily_basic / search_stock）+ 迁移现有 stock_agent 系统提示词；
+  子 agent 字段名以 deepagents v0.7.x `SubAgent` TypedDict 为准
+  （`name/description/system_prompt/tools`，model 省略则继承主模型），实现前先验证
+  安装版本的 `SubAgent.__annotations__`
 - `middleware=[TodoListMiddleware()]` — **显式启用**（deepagents v0.7 起默认关闭）
 - `checkpointer=AsyncSqliteSaver`，库文件 `store/agent_checkpoints.sqlite`
   （`store/` 已被 git 忽略），路径经 `app/core/config.py` 配置
