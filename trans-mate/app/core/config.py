@@ -96,3 +96,13 @@ ASR_BASE_URL = os.getenv("ASR_BASE_URL", "http://127.0.0.1:8002")
 # TTS 语音合成服务（freeswitch-tts，CosyVoice3 24kHz）
 TTS_WS_URL = os.getenv("TTS_WS_URL", "ws://127.0.0.1:8003/ws/tts")
 TTS_PROMPT_WAV = os.getenv("TTS_PROMPT_WAV", "./asset/zero_shot_prompt.wav")
+
+# Deep Agent Harness（langgraph checkpoint 持久化）
+CHECKPOINT_DB_PATH = os.getenv(
+    "CHECKPOINT_DB_PATH",
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "store",
+        "agent_checkpoints.sqlite",
+    ),
+)
