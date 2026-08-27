@@ -62,7 +62,12 @@ MAIN_AGENT_PROMPT = """你是 TransMate 智能助手，帮助用户完成资料�
 用户工作区（启用时）：
 - 你的文件操作限制在当前用户的工作沙箱内；当前会话的工作目录是 sessions/{会话ID}/，用户其他会话的成果在 sessions/ 的兄弟目录中，可以直接引用
 - /skills/ 是已安装技能库（只读，禁止写入）：任务匹配某技能时，先 read_file 读取其 SKILL.md（limit=1000）并按其指引执行
-- 完成可交付成果（如 PPT/PDF/报告/代码包等文件）后，调用 save_artifact 将其保存为制品，供用户随时跨设备下载
+
+【文件交付流程——必须遵守】
+凡用户要求"生成/保存/导出/写成文件"的任务，固定两步，缺一不可：
+1. write_file 把内容写入沙箱；
+2. 紧接着调用 save_artifact 把该文件上传为云盘制品（source_path 用第 1 步的同一路径）。
+只执行第 1 步就回复"已保存"是错误的：用户在云盘制品面板看不到文件，等于没有交付。回复用户时，必须以 save_artifact 的成功结果为准。
 """
 
 # stock 子智能体提示（迁移自 app/llm/agents/stock_agent.py）
@@ -277,6 +282,22 @@ class DeepAgentHarness(AgentHarness):
             for event in self._adapt_event(raw, state):
                 yield event
 
+        # 轮末兜底:write_file 过但未 save_artifact 的文件自动上云盘(否则用户云盘看不到)
+        pending = state.get("written_files", set()) - state.get("saved_paths", set())
+        if user_id is not None and pending:
+            from app.llm.tools.artifact_tool import make_save_artifact_tool
+
+            autosave = make_save_artifact_tool(user_id)
+            for path in sorted(pending):
+                result = autosave.invoke(
+                    {"source_path": path},
+                    config={"configurable": {"thread_id": thread_id}},
+                )
+                if result.startswith("已保存"):
+                    yield {"type": EVENT_STATUS, "message": f"自动保存制品：{result}"}
+                else:
+                    logger.info("自动补录跳过 %s: %s", path, result)
+
     async def _resolve_input_messages(
         self, history: List[BaseMessage], config: dict
     ) -> List[BaseMessage]:
@@ -315,6 +336,17 @@ class DeepAgentHarness(AgentHarness):
         if kind == "on_tool_start":
             tool_input = data.get("input")
             out = [{"type": EVENT_STATUS, "message": f"正在调用工具 {name}..."}]
+
+            # 轮末自动补录的差集依据:记录本轮写过/已交付的文件(小模型常漏调 save_artifact)
+            if name == "write_file":
+                # deepagents write_file 的参数名为 file_path
+                written = str((tool_input or {}).get("file_path", ""))
+                if written:
+                    state.setdefault("written_files", set()).add(written)
+            elif name == "save_artifact":
+                saved = str((tool_input or {}).get("source_path", ""))
+                if saved:
+                    state.setdefault("saved_paths", set()).add(saved)
 
             if name == "write_todos":
                 todos = (tool_input or {}).get("todos", [])

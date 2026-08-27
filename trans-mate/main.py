@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import traceback
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -93,21 +94,35 @@ async def _send_event(websocket: WebSocket, event: dict):
 
 
 async def run_agent_stream(
-    websocket: WebSocket, user_message: str, conversation_id: int
+    websocket: WebSocket, user_message: str, conversation_id: int | None,
+    thread_id: str | None = None,
 ):
-    """执行智能体流式生成，并逐事件推送给客户端"""
-    db = SessionLocal()
-    try:
-        chat_service.add_message(db, conversation_id, "user", user_message)
-        records = chat_service.list_messages(db, conversation_id, limit=20)
-        history = build_history_messages(records)
+    """执行智能体流式生成，并逐事件推送给客户端
 
-        conversation = chat_service.get_conversation(db, conversation_id)
-        # "anonymous" 是 WS 未携带 user_id 时的占位,保持传统路径(非工作区)
-        conv_user = conversation.user_id if conversation else None
-        user_id = conv_user if conv_user and conv_user != "anonymous" else None
-        async for event in stream_agent_events(history, f"conv-{conversation_id}", user_id=user_id):
-            if event["type"] == "done":
+    conversation_id 为 None 表示匿名消息:不落库(会话/消息均不写),
+    多轮上下文由连接级 thread 的 checkpoint 承载,断开即焚。
+    """
+    db = SessionLocal() if conversation_id is not None else None
+    try:
+        if db is not None:
+            chat_service.add_message(db, conversation_id, "user", user_message)
+            records = chat_service.list_messages(db, conversation_id, limit=20)
+            history = build_history_messages(records)
+
+            conversation = chat_service.get_conversation(db, conversation_id)
+            # "anonymous" 是 WS 未携带 user_id 时的占位,保持传统路径(非工作区)
+            conv_user = conversation.user_id if conversation else None
+            user_id = conv_user if conv_user and conv_user != "anonymous" else None
+            agent_thread = f"conv-{conversation_id}"
+        else:
+            from langchain_core.messages import HumanMessage
+
+            history = [HumanMessage(content=user_message)]
+            user_id = None
+            agent_thread = thread_id or "anon"
+
+        async for event in stream_agent_events(history, agent_thread, user_id=user_id):
+            if event["type"] == "done" and db is not None:
                 chat_service.add_message(
                     db,
                     conversation_id,
@@ -125,12 +140,15 @@ async def run_agent_stream(
         logger.error(f"完整堆栈: {traceback.format_exc()}")
         await _send_event(websocket, {"type": "error", "message": f"服务异常: {e}"})
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    # 匿名连接的临时 thread:连接内多轮共享 checkpoint 上下文,断开即焚
+    anon_thread = f"anon-{uuid.uuid4().hex[:8]}"
     generation_task: asyncio.Task | None = None
     try:
         while True:
@@ -163,24 +181,28 @@ async def websocket_endpoint(websocket: WebSocket):
 
             conversation_id = payload.get("conversation_id")
             if not conversation_id:
-                db = SessionLocal()
-                try:
-                    conversation = chat_service.create_conversation(
-                        db, payload.get("user_id", "anonymous")
+                ws_user = str(payload.get("user_id") or "anonymous")
+                if ws_user == "anonymous":
+                    # 匿名:不建会话、不落库,用连接级 thread 跑 ephemeral 轮次
+                    conversation_id = None
+                else:
+                    db = SessionLocal()
+                    try:
+                        conversation = chat_service.create_conversation(db, ws_user)
+                        conversation_id = conversation.id
+                    finally:
+                        db.close()
+                    await _send_event(
+                        websocket,
+                        {
+                            "type": "conversation_created",
+                            "conversation_id": conversation_id,
+                        },
                     )
-                    conversation_id = conversation.id
-                finally:
-                    db.close()
-                await _send_event(
-                    websocket,
-                    {
-                        "type": "conversation_created",
-                        "conversation_id": conversation_id,
-                    },
-                )
 
+            round_thread = f"conv-{conversation_id}" if conversation_id else anon_thread
             generation_task = asyncio.create_task(
-                run_agent_stream(websocket, user_message, conversation_id)
+                run_agent_stream(websocket, user_message, conversation_id, round_thread)
             )
     except WebSocketDisconnect:
         logging.info("WebSocket连接已断开")

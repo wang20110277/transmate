@@ -91,3 +91,34 @@ def test_delete_conversation_clears_checkpoint(client, monkeypatch):
     resp = test_client.delete(f"/api/conversations/{conv['id']}")
     assert resp.status_code == 200
     assert stub.cleared == [f"conv-{conv['id']}"]
+
+
+@pytest.mark.integration
+def test_anonymous_message_not_persisted(client, monkeypatch):
+    """匿名消息:不建会话、不写消息表、不发 conversation_created,thread 为连接级 anon-*"""
+    test_client, engine = client
+    stub = StubHarness()
+    from app.llm import streaming
+    monkeypatch.setattr(streaming, "get_agent_harness", lambda: stub)
+
+    with test_client.websocket_connect("/ws") as ws:
+        ws.send_text(json.dumps({"type": "chat_message", "message": "随便聊聊", "user_id": "anonymous"}))
+        events = []
+        while True:
+            e = json.loads(ws.receive_text())
+            events.append(e)
+            if e["type"] == "done":
+                break
+
+    types = [e["type"] for e in events]
+    assert "conversation_created" not in types
+    assert types[0] == "agent_start"  # 流直接开始,无会话事件
+    assert len(stub.threads) == 1 and stub.threads[0].startswith("anon-")
+
+    from app.models.conversation import Conversation, ChatMessage
+
+    Session = sessionmaker(bind=engine)
+    db = Session()
+    assert db.query(Conversation).count() == 0
+    assert db.query(ChatMessage).count() == 0
+    db.close()
