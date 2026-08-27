@@ -40,9 +40,9 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true
 
       try {
-        // 尝试刷新token
+        // 尝试刷新token（uid 是数字型用户 id，user_id 是 trans_xxx 展示串，refresh 接口要数字）
         const refreshToken = localStorage.getItem('refresh_token')
-        const userId = localStorage.getItem('user_id')
+        const userId = localStorage.getItem('uid')
         const deviceId = localStorage.getItem('device_id')
 
         if (refreshToken && userId && deviceId) {

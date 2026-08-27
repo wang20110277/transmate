@@ -12,9 +12,15 @@
         <span class="brand-name">TransMate</span>
       </div>
 
-      <button class="new-chat-btn" @click="newConversation">
+      <button class="new-chat-btn" @click="onNewConversation">
         <i class="fas fa-plus"></i>
         <span>{{ t('home.newChat') }}</span>
+      </button>
+
+      <!-- 云盘制品入口：点击后右侧主区切换为制品列表，再点或选中会话切回对话 -->
+      <button :class="['cloud-entry-btn', { active: mainView === 'artifacts' }]" @click="toggleArtifacts">
+        <i class="fas fa-cloud"></i>
+        <span>{{ t('home.artifacts') }}</span>
       </button>
 
       <div class="recent-label">{{ t('home.recent') }}</div>
@@ -23,30 +29,42 @@
         <ChatSidebar
           :conversations="conversations"
           :current-conversation-id="currentConversationId"
-          @new-conversation="newConversation"
-          @select-conversation="selectConversation"
+          @new-conversation="onNewConversation"
+          @select-conversation="onSelectConversation"
           @remove-conversation="removeConversation"
         />
       </div>
 
       <div class="sidebar-footer">
         <div class="footer-row">
-          <button class="user-btn" :title="t('home.prefButton')" :aria-label="t('home.prefButton')" @click.stop="toggleUserMenu">
-            <span class="user-avatar"><i class="fas fa-user"></i></span>
-          </button>
-          <button class="settings-entry-btn" :title="t('home.settings')" :aria-label="t('home.openSettings')" @click="goSettings">
-            <i class="fas fa-cog"></i>
-          </button>
-          <button class="settings-entry-btn" :title="t('home.skills')" :aria-label="t('home.skills')" @click="goSkills">
-            <i class="fas fa-puzzle-piece"></i>
-          </button>
-          <button class="settings-entry-btn" :title="t('home.artifacts')" :aria-label="t('home.artifacts')" @click="openArtifacts">
-            <i class="fas fa-box-open"></i>
-          </button>
+          <template v-if="userStore.isLoggedIn">
+            <button class="user-btn" :title="t('home.prefButton')" :aria-label="t('home.prefButton')" @click.stop="toggleUserMenu">
+              <span class="user-avatar">
+                <img v-if="userStore.userInfo?.avatar_url" :src="userStore.userInfo.avatar_url" alt="">
+                <span v-else class="avatar-letter">{{ avatarLetter }}</span>
+              </span>
+            </button>
+            <button class="settings-entry-btn" :title="t('home.settings')" :aria-label="t('home.openSettings')" @click="goSettings">
+              <i class="fas fa-cog"></i>
+            </button>
+          </template>
+          <template v-else>
+            <button class="user-btn login-entry" :title="t('home.login')" :aria-label="t('home.login')" @click.stop="loginDialogOpen = true">
+              <span class="user-avatar"><i class="fas fa-user"></i></span>
+              <span class="login-text">{{ t('home.login') }}</span>
+            </button>
+          </template>
         </div>
 
-        <!-- 偏好浮层：语言 / 主题 / 连接 -->
+        <!-- 偏好浮层：登录用户信息 / 语言 / 主题 / 连接 -->
         <div v-if="userMenuOpen" class="user-popover" @click.stop>
+          <template v-if="userStore.isLoggedIn">
+            <div class="pop-user">
+              <div class="pop-user-name">{{ userStore.userInfo?.nickname || maskedPhone || userStore.userInfo?.user_id }}</div>
+              <div v-if="maskedPhone" class="pop-user-phone">{{ maskedPhone }}</div>
+            </div>
+            <div class="pop-divider"></div>
+          </template>
           <div class="pop-title">{{ t('home.prefTitle') }}</div>
 
           <div class="pop-row">
@@ -81,6 +99,14 @@
             </div>
             <p class="conn-hint">{{ t('home.connHint') }}</p>
           </div>
+
+          <template v-if="userStore.isLoggedIn">
+            <div class="pop-divider"></div>
+            <button class="pop-logout" @click="onLogout">
+              <i class="fas fa-right-from-bracket"></i>
+              <span>{{ t('home.logout') }}</span>
+            </button>
+          </template>
         </div>
       </div>
     </aside>
@@ -119,39 +145,96 @@
           <span class="close-btn">×</span>
         </div>
 
-        <!-- 空状态：欢迎语 + 推荐卡片 -->
-        <div v-if="dialogue.length === 0 && !isProcessing" class="welcome">
-          <h1 class="greeting">{{ t('home.greeting') }}</h1>
-
-          <div class="rec-section">
-            <div class="rec-label">{{ t('home.recommend') }}</div>
-            <div class="rec-grid">
-              <button
-                v-for="item in suggestions"
-                :key="item.text"
-                class="rec-card"
-                @click="useSuggestion(item.text)"
-              >
-                <i :class="['fas', item.icon]"></i>
-                <span>{{ item.text }}</span>
-              </button>
+        <!-- 云盘制品视图：对话框区域切换为制品列表 -->
+        <div v-if="mainView === 'artifacts'" class="cloud-panel">
+          <header class="cloud-header">
+            <h1 class="cloud-title">
+              {{ artifactsView === 'recycled' ? t('artifacts.recycleBin') : t('artifacts.title') }}
+            </h1>
+            <div class="cloud-header-right">
+              <div class="cloud-view-seg">
+                <button :class="['seg-btn', { active: artifactsView === 'active' }]" @click="switchArtifactsView('active')">
+                  {{ t('artifacts.title') }}
+                </button>
+                <button :class="['seg-btn', { active: artifactsView === 'recycled' }]" @click="switchArtifactsView('recycled')">
+                  {{ t('artifacts.recycleBin') }}
+                </button>
+              </div>
+              <el-checkbox v-if="artifactsView === 'active'" v-model="onlyCurrentConversation" @change="loadArtifacts">
+                {{ t('artifacts.onlyCurrent') }}
+              </el-checkbox>
             </div>
+          </header>
+          <div v-loading="artifactsLoading" class="artifact-list">
+            <div v-for="a in artifacts" :key="a.id" class="artifact-row">
+              <div class="artifact-info">
+                <div class="artifact-name">{{ a.filename }}</div>
+                <div v-if="artifactsView === 'recycled' && a.archived_at" class="artifact-meta">
+                  {{ formatSize(a.size) }} · {{ t('artifacts.archivedAt', { time: a.archived_at }) }}
+                </div>
+                <div v-else class="artifact-meta">{{ formatSize(a.size) }} · {{ a.created_at }}</div>
+              </div>
+              <div class="artifact-actions">
+                <template v-if="artifactsView === 'active'">
+                  <el-button size="small" type="primary" plain @click="downloadArtifact(a)">
+                    {{ t('artifacts.download') }}
+                  </el-button>
+                  <el-button size="small" plain @click="archiveOne(a)">
+                    {{ t('artifacts.archive') }}
+                  </el-button>
+                </template>
+                <template v-else>
+                  <el-button size="small" type="primary" plain @click="restoreOne(a)">
+                    {{ t('artifacts.restore') }}
+                  </el-button>
+                  <el-button size="small" type="danger" plain @click="purgeOne(a)">
+                    {{ t('artifacts.purge') }}
+                  </el-button>
+                </template>
+              </div>
+            </div>
+            <el-empty
+              v-if="!artifactsLoading && artifacts.length === 0"
+              :description="artifactsView === 'recycled' ? t('artifacts.recycledEmpty') : t('artifacts.empty')"
+            />
           </div>
         </div>
 
-        <!-- 对话状态：消息列表 -->
-        <MessageList
-          v-else
-          :messages="dialogue"
-          :is-processing="isProcessing"
-          :processing-status="processingStatus"
-          :speaking-index="speakingIndex"
-          :tts-muted="!ttsEnabled"
-          @toggle-speak="onToggleSpeak"
-        />
+        <template v-else>
+          <!-- 空状态：欢迎语 + 推荐卡片 -->
+          <div v-if="dialogue.length === 0 && !isProcessing" class="welcome">
+            <h1 class="greeting">{{ t('home.greeting') }}</h1>
+
+            <div class="rec-section">
+              <div class="rec-label">{{ t('home.recommend') }}</div>
+              <div class="rec-grid">
+                <button
+                  v-for="item in suggestions"
+                  :key="item.text"
+                  class="rec-card"
+                  @click="useSuggestion(item.text)"
+                >
+                  <i :class="['fas', item.icon]"></i>
+                  <span>{{ item.text }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 对话状态：消息列表 -->
+          <MessageList
+            v-else
+            :messages="dialogue"
+            :is-processing="isProcessing"
+            :processing-status="processingStatus"
+            :speaking-index="speakingIndex"
+            :tts-muted="!ttsEnabled"
+            @toggle-speak="onToggleSpeak"
+          />
+        </template>
       </div>
 
-      <div class="input-wrap">
+      <div v-if="mainView === 'chat'" class="input-wrap">
         <ChatInput
           v-model="newMessage"
           :is-processing="isProcessing"
@@ -166,38 +249,31 @@
       </div>
     </main>
 
-    <!-- 制品抽屉：查看/下载助手保存的产物文件 -->
-    <el-drawer v-model="artifactsVisible" :title="t('artifacts.title')" size="360px">
-      <el-checkbox v-model="onlyCurrentConversation" @change="loadArtifacts">
-        {{ t('artifacts.onlyCurrent') }}
-      </el-checkbox>
-      <div v-loading="artifactsLoading" class="artifact-list">
-        <div v-for="a in artifacts" :key="a.id" class="artifact-row">
-          <div class="artifact-info">
-            <div class="artifact-name">{{ a.filename }}</div>
-            <div class="artifact-meta">{{ formatSize(a.size) }} · {{ a.created_at }}</div>
-          </div>
-          <el-button size="small" type="primary" plain @click="downloadArtifact(a)">
-            {{ t('artifacts.download') }}
-          </el-button>
-        </div>
-        <el-empty v-if="!artifactsLoading && artifacts.length === 0" :description="t('artifacts.empty')" />
-      </div>
-    </el-drawer>
+    <!-- 登录弹框（未登录时由左下角入口打开） -->
+    <LoginDialog v-model="loginDialogOpen" @success="onLoginSuccess" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { useUserStore } from '@/stores/user';
 import { useI18n } from '@/i18n';
 import ChatSidebar from '../components/agent/ChatSidebar.vue';
 import MessageList from '../components/agent/MessageList.vue';
 import ChatInput from '../components/agent/ChatInput.vue';
+import LoginDialog from '../components/LoginDialog.vue';
 import { useAgentChat } from '@/composables/useAgentChat';
 import { transcribeAudio, synthesizeSpeech } from '@/services/api';
-import { listArtifacts, getArtifactDownloadUrl, type ArtifactItem } from '@/services/artifacts';
+import {
+  archiveArtifact,
+  getArtifactDownloadUrl,
+  listArtifacts,
+  purgeArtifact,
+  restoreArtifact,
+  type ArtifactItem,
+} from '@/services/artifacts';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -302,6 +378,7 @@ const {
   isProcessing,
   processingStatus,
   connect,
+  disconnect,
   sendMessage: sendChatMessage,
   stopGeneration,
   refreshConversations,
@@ -390,6 +467,46 @@ const apiBaseInput = ref<string>(
 
 const toggleUserMenu = () => { userMenuOpen.value = !userMenuOpen.value; };
 
+// ===== 登录态（左下角入口 / 弹框登录 / 退出） =====
+const loginDialogOpen = ref<boolean>(false);
+
+// 头像字母：昵称或 user_id 首字符；无头像时显示
+const avatarLetter = computed(() => {
+  const info = userStore.userInfo;
+  if (!info) return '';
+  return (info.nickname || info.user_id || '?').trim().charAt(0).toUpperCase();
+});
+
+// 手机号脱敏展示（138****8000）
+const maskedPhone = computed(() => {
+  const phone = userStore.userInfo?.phone || '';
+  return phone ? phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '';
+});
+
+// 切换用户视角（登录/退出）：立即启用新会话（清屏），WS 按新 user_id 重连 + 会话/制品列表刷新
+const applyUserIdentity = () => {
+  newConversation();          // 停止生成 + 清空对话 + currentConversationId 置空
+  mainView.value = 'chat';    // 若在云盘/回收站视图，切回对话视图
+  disconnect();
+  connect();
+  refreshConversations();
+  loadArtifacts();
+};
+
+const onLoginSuccess = () => {
+  loginDialogOpen.value = false;
+  userId.value = userStore.userInfo?.user_id || 'anonymous';
+  applyUserIdentity();
+};
+
+const onLogout = async () => {
+  userMenuOpen.value = false;
+  await userStore.logoutUser();
+  userId.value = 'anonymous';
+  applyUserIdentity();
+  ElMessage.success(t('home.logoutSuccess'));
+};
+
 // 切换界面语言：i18n 模块内持久化并即时生效
 const setUiLang = (value: string) => {
   setLang(value === 'en' ? 'en' : 'zh');
@@ -422,17 +539,33 @@ watch(userMenuOpen, (open) => {
 
 const goSettings = () => { router.push('/settings'); };
 
-const goSkills = () => { router.push('/skills'); };
-
-// ===== 制品面板（助手保存的产物文件）=====
-const artifactsVisible = ref<boolean>(false);
+// ===== 云盘制品（助手保存到云盘的产物文件）=====
+// 主区视图：chat 为对话界面，artifacts 为云盘制品列表
+const mainView = ref<'chat' | 'artifacts'>('chat');
+// 制品子视图：active 为云盘制品，recycled 为回收站
+const artifactsView = ref<'active' | 'recycled'>('active');
 const artifactsLoading = ref<boolean>(false);
 const artifacts = ref<ArtifactItem[]>([]);
 const onlyCurrentConversation = ref<boolean>(true);
 
-const openArtifacts = () => {
-  artifactsVisible.value = true;
+// 左栏入口：切换到云盘制品列表；再次点击切回对话
+const toggleArtifacts = () => {
+  if (mainView.value === 'artifacts') {
+    mainView.value = 'chat';
+    return;
+  }
+  mainView.value = 'artifacts';
   loadArtifacts();
+};
+
+// 新建/选中会话时回到对话视图
+const onNewConversation = () => {
+  mainView.value = 'chat';
+  newConversation();
+};
+const onSelectConversation = (conversationId: number) => {
+  mainView.value = 'chat';
+  selectConversation(conversationId);
 };
 
 const loadArtifacts = async () => {
@@ -440,16 +573,53 @@ const loadArtifacts = async () => {
   artifactsLoading.value = true;
   try {
     const convId = onlyCurrentConversation.value ? currentConversationId.value : undefined;
-    const data = await listArtifacts(userId.value, convId ?? undefined);
+    const data = await listArtifacts(userId.value, convId ?? undefined, artifactsView.value === 'recycled');
     artifacts.value = data.items;
   } finally {
     artifactsLoading.value = false;
   }
 };
 
+// 云盘/回收站视图切换
+const switchArtifactsView = (view: 'active' | 'recycled') => {
+  if (artifactsView.value === view) return;
+  artifactsView.value = view;
+  loadArtifacts();
+};
+
+const archiveOne = async (a: ArtifactItem) => {
+  await archiveArtifact(a.id, userId.value);
+  loadArtifacts();
+};
+
+const restoreOne = async (a: ArtifactItem) => {
+  await restoreArtifact(a.id, userId.value);
+  loadArtifacts();
+};
+
+const purgeOne = async (a: ArtifactItem) => {
+  try {
+    await ElMessageBox.confirm(
+      t('artifacts.purgeConfirm', { name: a.filename }),
+      t('artifacts.purgeTitle'),
+      { type: 'warning', confirmButtonText: t('artifacts.purge'), cancelButtonText: t('home.cancel') }
+    );
+  } catch {
+    return; // 取消
+  }
+  await purgeArtifact(a.id, userId.value);
+  loadArtifacts();
+};
+
 const downloadArtifact = async (a: ArtifactItem) => {
   const url = await getArtifactDownloadUrl(a.id, userId.value);
-  window.open(url, '_blank');
+  // 预签名 URL 带 Content-Disposition: attachment,动态 a 标签静默触发下载,不弹空白新窗
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = a.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 };
 
 const formatSize = (bytes: number): string => {
@@ -470,10 +640,13 @@ const sendMessage = () => {
 };
 
 onMounted(async () => {
-  // 初始化用户状态
+  // 初始化用户状态（有本地 token 时恢复登录态，刷新后不丢失）
   userStore.initFromStorage();
+  if (userStore.token && !userStore.userInfo) {
+    await userStore.fetchUserInfo();
+  }
   if (userStore.userInfo) {
-    userId.value = localStorage.getItem('user_code') || userStore.userInfo.user_id;
+    userId.value = localStorage.getItem('user_id') || userStore.userInfo.user_id;
   }
 
   connect();
@@ -579,6 +752,37 @@ onUnmounted(() => {
   background: var(--color-primary-soft);
 }
 
+/* 云盘制品入口（最近对话上方）：造型与新对话按钮一致，激活时高亮 */
+.home-layout .cloud-entry-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-sizing: border-box;
+}
+
+.home-layout .cloud-entry-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.home-layout .cloud-entry-btn.active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-weight: 500;
+}
+
 .home-layout .recent-label {
   padding: 18px 10px 6px;
   font-size: 12px;
@@ -629,6 +833,76 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   border-radius: 50%;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* 登录用户头像：真实头像图 / 昵称首字 */
+.home-layout .user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-layout .avatar-letter {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 未登录：左下角登录入口（头像图标 + "登录"文字） */
+.home-layout .user-btn.login-entry {
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-layout .login-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 偏好浮层内的登录用户信息与退出入口 */
+.home-layout .pop-user {
+  padding: 2px 2px 4px;
+}
+
+.home-layout .pop-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-layout .pop-user-phone {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.home-layout .pop-logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.home-layout .pop-logout:hover {
+  color: #dc2626;
+  background: var(--color-hover);
 }
 
 /* 设置入口按钮（与头像分居底部左右两侧） */
@@ -652,7 +926,64 @@ onUnmounted(() => {
   background: var(--color-hover);
 }
 
-/* ===== 制品抽屉（teleport 到 body，使用全局类名与主题 tokens） ===== */
+/* ===== 云盘制品主区面板（对话区切换视图，使用主题 tokens） ===== */
+.home-layout .cloud-panel {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.home-layout .cloud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.home-layout .cloud-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* 云盘/回收站视图切换 */
+.home-layout .cloud-view-seg {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--color-hover);
+  border-radius: 8px;
+}
+
+.home-layout .cloud-view-seg .seg-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.home-layout .cloud-view-seg .seg-btn.active {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.home-layout .artifact-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.home-layout .cloud-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .artifact-list {
   display: flex;
   flex-direction: column;

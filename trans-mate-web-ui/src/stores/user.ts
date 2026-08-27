@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getCurrentUser, logout } from '@/services/api'
+import { getCurrentUser, logout, passwordLogin } from '@/services/api'
 
 export interface UserInfo {
   id: number
@@ -26,6 +26,24 @@ export const useUserStore = defineStore('user', () => {
   // Actions
   const setUserInfo = (info: UserInfo | null) => {
     userInfo.value = info
+  }
+
+  // 手机号密码登录(后端登录/注册一体:新手机号带 confirmPassword 自动注册)
+  const loginWithPassword = async (
+    phone: string,
+    password: string,
+    confirmPassword?: string
+  ): Promise<void> => {
+    const response = await passwordLogin(phone, password, confirmPassword)
+    const { id, access_token, refresh_token, device_id, user_id, is_first_login } = response.data
+    localStorage.setItem('token', access_token)
+    localStorage.setItem('refresh_token', refresh_token)
+    localStorage.setItem('device_id', device_id)
+    localStorage.setItem('user_id', user_id)
+    localStorage.setItem('uid', String(id))
+    localStorage.setItem('is_first_login', String(is_first_login))
+    isFirstLogin.value = is_first_login
+    await fetchUserInfo()
   }
 
   const fetchUserInfo = async (): Promise<boolean> => {
@@ -65,6 +83,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('user_id')
     localStorage.removeItem('device_id')
     localStorage.removeItem('user_id')
+    localStorage.removeItem('uid')
     localStorage.removeItem('is_first_login')
   }
 
@@ -83,6 +102,7 @@ export const useUserStore = defineStore('user', () => {
     token,
     deviceId,
     setUserInfo,
+    loginWithPassword,
     fetchUserInfo,
     logoutUser,
     clearAuth,
