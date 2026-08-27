@@ -1,7 +1,7 @@
 <template>
+  <!-- 作为设置页「技能」分区的内容面板嵌入，标题由设置页头部提供 -->
   <div class="skills-page">
     <header class="skills-header">
-      <h1>{{ t('skills.title') }}</h1>
       <el-button :loading="refreshing" @click="onRefresh">{{ t('skills.refresh') }}</el-button>
     </header>
 
@@ -164,8 +164,8 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.skills-page { max-width: 1100px; margin: 0 auto; padding: 24px; }
-.skills-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.skills-page { width: 100%; max-width: 1100px; margin: 0 auto; }
+.skills-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 12px; }
 .skills-search { margin-bottom: 12px; }
 .skill-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
 .skill-info { flex: 1; min-width: 0; }

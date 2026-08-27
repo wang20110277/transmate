@@ -37,8 +37,10 @@
         <h1 class="settings-title">{{ currentItem.label }}</h1>
       </header>
 
-      <div class="settings-body">
-        <div class="placeholder-card">
+      <div :class="['settings-body', { panel: activeKey === 'skills' }]">
+        <!-- 技能分区：嵌入技能管理面板（仓库浏览/搜索/装卸） -->
+        <SkillsPanel v-if="activeKey === 'skills'" />
+        <div v-else class="placeholder-card">
           <span class="placeholder-icon">
             <i :class="['fas', currentItem.icon]"></i>
           </span>
@@ -55,6 +57,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from '@/i18n'
+import SkillsPanel from './Skills.vue'
 
 interface MenuItem {
   key: string
@@ -275,6 +278,12 @@ const goHome = () => {
   justify-content: center;
   padding: 40px 32px;
   box-sizing: border-box;
+}
+
+/* 嵌入面板类分区（如技能管理）：块级铺满，去掉居中空态布局 */
+.settings-layout .settings-body.panel {
+  display: block;
+  padding: 24px 32px;
 }
 
 /* 占位空状态卡片 */

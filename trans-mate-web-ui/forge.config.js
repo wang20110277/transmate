@@ -52,7 +52,10 @@ module.exports = {
     new FusesPlugin({
       version: FuseVersion.V1,
       [FuseV1Options.RunAsNode]: false,
-      [FuseV1Options.EnableCookieEncryption]: true,
+      // Cookie 加密依赖钥匙串；本仓库以 ad-hoc 重签名打包，每次构建身份都变，
+      // 访问旧 Safe Storage 密钥会触发钥匙串授权，无人应答时 SecKeychain 阻塞，
+      // 进而卡死网络服务（所有请求挂起）。应用无敏感 cookie，保持关闭。
+      [FuseV1Options.EnableCookieEncryption]: false,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
