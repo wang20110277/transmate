@@ -12,6 +12,8 @@ class ArtifactItem(BaseModel):
     size: int
     description: str = ""
     created_at: Optional[datetime] = None
+    archived: bool = False
+    archived_at: Optional[datetime] = None
 
 
 class ArtifactListResponse(BaseModel):
@@ -21,3 +23,7 @@ class ArtifactListResponse(BaseModel):
 
 class ArtifactDownloadResponse(BaseModel):
     url: str
+
+
+class MessageResponse(BaseModel):
+    message: str

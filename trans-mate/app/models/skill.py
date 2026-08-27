@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Column, DateTime, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, Text, UniqueConstraint
 
 from app.core.database import Base
 
@@ -44,3 +44,7 @@ class Artifact(Base):
     created_at = Column(
         DateTime, nullable=True, default=datetime.now, comment="创建时间"
     )
+    archived = Column(
+        Boolean, nullable=False, default=False, index=True, comment="是否在回收站"
+    )
+    archived_at = Column(DateTime, nullable=True, comment="归档时间")

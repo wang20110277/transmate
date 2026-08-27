@@ -33,6 +33,9 @@ class FakeStorage(StorageService):
         for key in [k for k in self.objects if k.startswith(prefix)]:
             del self.objects[key]
 
+    def delete_key(self, key: str) -> None:
+        self.objects.pop(key, None)
+
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         self.objects[key] = data
 
@@ -41,7 +44,7 @@ class FakeStorage(StorageService):
             raise KeyError(f"对象不存在: {key}")
         return self.objects[key]
 
-    def presigned_get_url(self, key: str, expires_seconds: int) -> str:
+    def presigned_get_url(self, key: str, expires_seconds: int, filename: str | None = None) -> str:
         return f"fake:///{key}"
 
     def list_keys(self, prefix: str) -> list[str]:

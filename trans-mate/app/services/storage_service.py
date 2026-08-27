@@ -28,13 +28,16 @@ class StorageService:
     def delete_prefix(self, prefix: str) -> None:
         raise NotImplementedError
 
+    def delete_key(self, key: str) -> None:
+        raise NotImplementedError
+
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         raise NotImplementedError
 
     def get_bytes(self, key: str) -> bytes:
         raise NotImplementedError
 
-    def presigned_get_url(self, key: str, expires_seconds: int) -> str:
+    def presigned_get_url(self, key: str, expires_seconds: int, filename: str | None = None) -> str:
         raise NotImplementedError
 
     def list_keys(self, prefix: str) -> list[str]:
@@ -88,6 +91,9 @@ class MinioStorageService(StorageService):
         for key in self.list_keys(prefix):
             client.remove_object(MINIO_BUCKET, key)
 
+    def delete_key(self, key: str) -> None:
+        self._get_client().remove_object(MINIO_BUCKET, key)
+
     def put_bytes(self, key: str, data: bytes, content_type: str = "application/octet-stream") -> None:
         import io
 
@@ -106,11 +112,21 @@ class MinioStorageService(StorageService):
             response.close()
             response.release_conn()
 
-    def presigned_get_url(self, key: str, expires_seconds: int) -> str:
+    def presigned_get_url(self, key: str, expires_seconds: int, filename: str | None = None) -> str:
         from datetime import timedelta
+        from urllib.parse import quote
 
+        response_headers = None
+        if filename:
+            # RFC 5987 编码中文文件名,强制浏览器下载而非页面导航
+            response_headers = {
+                "response-content-disposition": (
+                    f"attachment; filename*=UTF-8''{quote(filename)}"
+                )
+            }
         return self._get_client().presigned_get_object(
-            MINIO_BUCKET, key, expires=timedelta(seconds=expires_seconds)
+            MINIO_BUCKET, key, expires=timedelta(seconds=expires_seconds),
+            response_headers=response_headers,
         )
 
     def list_keys(self, prefix: str) -> list[str]:
