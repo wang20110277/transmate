@@ -40,6 +40,7 @@ from app.services.auth_service import (
     refresh_auth_tokens,
     logout_user,
     get_current_user_from_token,
+    wire_access_token,
 )
 from app.services.sms_service import (
     send_sms_code,
@@ -231,7 +232,7 @@ async def wechat_qr_login(request: WechatLoginRequest, db: Session = Depends(get
     return TokenResponse(
         id=user.id,
         user_id=user.user_id,
-        access_token=access_token,
+        access_token=wire_access_token(user.id, device_id, access_token),
         refresh_token=refresh_token,
         device_id=device_id,
         is_first_login=False,  # 扫码登录必然是已存在的用户
@@ -289,7 +290,7 @@ async def wechat_login(request: WechatLoginRequest, db: Session = Depends(get_db
     return TokenResponse(
         id=user.id,
         user_id=user.user_id,
-        access_token=access_token,
+        access_token=wire_access_token(user.id, device_id, access_token),
         refresh_token=refresh_token,
         device_id=device_id,
         is_first_login=is_first_login,
@@ -348,7 +349,7 @@ async def sms_login(request: SMSLoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(
         id=user.id,
         user_id=user.user_id,
-        access_token=access_token,
+        access_token=wire_access_token(user.id, device_id, access_token),
         refresh_token=refresh_token,
         device_id=device_id,
         is_first_login=is_first_login,
@@ -421,7 +422,7 @@ async def password_login(request: PasswordLoginRequest, db: Session = Depends(ge
     return TokenResponse(
         id=user.id,
         user_id=user.user_id,
-        access_token=access_token,
+        access_token=wire_access_token(user.id, device_id, access_token),
         refresh_token=refresh_token,
         device_id=device_id,
         is_first_login=is_first_login,
@@ -449,7 +450,10 @@ async def refresh_token(request: RefreshTokenRequest):
     new_access_token, new_refresh_token = result
 
     return RefreshTokenResponse(
-        access_token=new_access_token, refresh_token=new_refresh_token
+        access_token=wire_access_token(
+            request.user_id, request.device_id, new_access_token
+        ),
+        refresh_token=new_refresh_token,
     )
 
 

@@ -19,8 +19,8 @@ def _seed(db, user_id, skills):
 def test_sync_downloads_all_skills(db, tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.config.SKILL_CACHE_ROOT", str(tmp_path))
     storage = FakeStorage()
-    storage.put_bytes("skills/u1/demo-a/SKILL.md", b"---\nname: demo-a\n---\nA")
-    storage.put_bytes("skills/u1/demo-b/SKILL.md", b"---\nname: demo-b\n---\nB")
+    storage.put_bytes("u1/skills/demo-a/SKILL.md", b"---\nname: demo-a\n---\nA")
+    storage.put_bytes("u1/skills/demo-b/SKILL.md", b"---\nname: demo-b\n---\nB")
     _seed(db, "u1", [("demo-a", "v1"), ("demo-b", "v1")])
 
     cache_dir = sync_user_skills(db, "u1", storage=storage)
@@ -33,11 +33,11 @@ def test_sync_downloads_all_skills(db, tmp_path, monkeypatch):
 def test_sync_skips_when_fingerprint_unchanged(db, tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.config.SKILL_CACHE_ROOT", str(tmp_path))
     storage = FakeStorage()
-    storage.put_bytes("skills/u1/demo-a/SKILL.md", b"A")
+    storage.put_bytes("u1/skills/demo-a/SKILL.md", b"A")
     _seed(db, "u1", [("demo-a", "v1")])
     sync_user_skills(db, "u1", storage=storage)
     # 删掉对象模拟"不应再下载"
-    storage.delete_prefix("skills/")
+    storage.delete_prefix("u1/")
     cache_dir = sync_user_skills(db, "u1", storage=storage)
     assert (Path(cache_dir) / "demo-a" / "SKILL.md").exists()  # 复用本地缓存
 
@@ -46,10 +46,10 @@ def test_sync_skips_when_fingerprint_unchanged(db, tmp_path, monkeypatch):
 def test_sync_refreshes_when_version_changes(db, tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.config.SKILL_CACHE_ROOT", str(tmp_path))
     storage = FakeStorage()
-    storage.put_bytes("skills/u1/demo-a/SKILL.md", b"old")
+    storage.put_bytes("u1/skills/demo-a/SKILL.md", b"old")
     _seed(db, "u1", [("demo-a", "v1")])
     sync_user_skills(db, "u1", storage=storage)
-    storage.put_bytes("skills/u1/demo-a/SKILL.md", b"new")
+    storage.put_bytes("u1/skills/demo-a/SKILL.md", b"new")
     row = db.query(UserSkill).filter_by(user_id="u1", name="demo-a").first()
     row.version = "v2"
     db.commit()

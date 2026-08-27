@@ -85,7 +85,7 @@ def make_save_artifact_tool(user_id: str, storage: StorageService | None = None)
             )
             db.add(row)
             db.flush()  # 先落库取自增 id,制品对象键与 PG 主键保持一致
-            row.storage_key = f"artifacts/{user_id}/{row.id}/{filename}"
+            row.storage_key = f"{user_id}/artifacts/{row.id}/{filename}"
             storage.put_bytes(row.storage_key, real.read_bytes())
             db.commit()
             return f"已保存制品：{filename}（id={row.id}）"

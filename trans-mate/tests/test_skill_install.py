@@ -60,7 +60,7 @@ def test_install_downloads_and_records(db, storage, monkeypatch):
     row = install_skill(db, "u1", "demo-skill")
     assert row.version == "sha-latest"
     assert row.name == "demo-skill"
-    keys = storage.list_keys("skills/u1/demo-skill")
+    keys = storage.list_keys("u1/skills/demo-skill")
     assert any(k.endswith("SKILL.md") for k in keys)
     assert any(k.endswith("helper.py") for k in keys)
     assert [r.name for r in list_installed(db, "u1")] == ["demo-skill"]
@@ -73,7 +73,7 @@ def test_install_rejects_oversize_file(db, storage, monkeypatch):
     )
     with pytest.raises(SkillServiceError, match="大小超限"):
         install_skill(db, "u1", "demo-skill")
-    assert storage.list_keys("skills/u1/") == []  # 无残留
+    assert storage.list_keys("u1/skills/") == []  # 无残留
     assert list_installed(db, "u1") == []
 
 
@@ -84,7 +84,7 @@ def test_install_midway_failure_cleans_up(db, storage, monkeypatch):
     )
     with pytest.raises(SkillServiceError):
         install_skill(db, "u1", "demo-skill")
-    assert storage.list_keys("skills/u1/") == []
+    assert storage.list_keys("u1/skills/") == []
     assert list_installed(db, "u1") == []
 
 
@@ -99,7 +99,7 @@ def test_uninstall_removes_storage_and_row(db, storage, monkeypatch):
     monkeypatch.setattr(skill_service, "_registry_transport", _install_transport())
     install_skill(db, "u1", "demo-skill")
     uninstall_skill(db, "u1", "demo-skill")
-    assert storage.list_keys("skills/u1/") == []
+    assert storage.list_keys("u1/skills/") == []
     assert list_installed(db, "u1") == []
 
 
@@ -109,4 +109,4 @@ def test_users_isolated(db, storage, monkeypatch):
     install_skill(db, "u1", "demo-skill")
     assert list_installed(db, "u2") == []
     with pytest.raises(KeyError):
-        storage.get_bytes("skills/u2/demo-skill/SKILL.md")
+        storage.get_bytes("u2/skills/demo-skill/SKILL.md")

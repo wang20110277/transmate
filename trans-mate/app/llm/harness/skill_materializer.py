@@ -47,7 +47,7 @@ def sync_user_skills(
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True, exist_ok=True)
         for row in rows:
-            storage.download_prefix(f"skills/{user_id}/{row.name}", staging / row.name)
+            storage.download_prefix(f"{user_id}/skills/{row.name}", staging / row.name)
         # 原子替换:staging -> cache_dir
         shutil.rmtree(cache_dir, ignore_errors=True)
         staging.rename(cache_dir)

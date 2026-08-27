@@ -39,15 +39,22 @@ def create_auth_tokens(user_id: int, device_id: Optional[str] = None) -> Tuple[s
     
     access_token = generate_token()
     refresh_token = generate_token()
-    
+
     # 存储到Redis
     session_key = RedisKeys.auth_session(str(user_id), device_id)
     refresh_key = RedisKeys.auth_refresh(str(user_id), device_id)
-    
+
     redis_client.setex(session_key, RedisTTL.AUTH_SESSION, access_token)
     redis_client.setex(refresh_key, RedisTTL.AUTH_REFRESH, refresh_token)
-    
+
     return access_token, refresh_token, device_id
+
+
+def wire_access_token(user_id: int, device_id: str, access_token: str) -> str:
+    """wire 格式:登录/刷新接口返回给前端的 access_token 为
+    `user_id:device_id:access_token` 三段(get_current_user_from_token 按此解析)。
+    Redis 内部仍存裸 token,仅出口拼接。"""
+    return f"{user_id}:{device_id}:{access_token}"
 
 
 def verify_access_token(user_id: int, device_id: str, token: str) -> bool:

@@ -17,7 +17,7 @@ def workspace(tmp_path, monkeypatch, db):
     monkeypatch.setattr("app.core.config.SKILL_CACHE_ROOT", str(tmp_path / "cache"))
     storage = FakeStorage()
     storage.put_bytes(
-        "skills/u1/demo-skill/SKILL.md",
+        "u1/skills/demo-skill/SKILL.md",
         "---\nname: demo-skill\ndescription: 演示技能端到端\n---\n# Demo\n".encode(
             "utf-8"
         ),
@@ -121,7 +121,7 @@ def test_cached_agent_sees_newly_installed_skill(workspace, db, monkeypatch):
 
     storage = FakeStorage()
     storage.put_bytes(
-        "skills/u1/late-skill/SKILL.md",
+        "u1/skills/late-skill/SKILL.md",
         "---\nname: late-skill\ndescription: 后装技能\n---\n# Late\n".encode("utf-8"),
     )
     monkeypatch.setattr("app.services.skill_service._storage_singleton_override", storage)

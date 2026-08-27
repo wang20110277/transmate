@@ -208,7 +208,7 @@ def install_skill(db: Session, user_id: str, name: str) -> UserSkill:
 
     storage = _get_storage()
     tmp_dir = Path(tempfile.mkdtemp(prefix=f"skill-{uuid.uuid4().hex[:8]}-"))
-    prefix = f"skills/{user_id}/{name}"
+    prefix = f"{user_id}/skills/{name}"
     try:
         with _build_client() as client:
             files = _walk_skill_dir(client, name)
@@ -260,7 +260,7 @@ def uninstall_skill(db: Session, user_id: str, name: str) -> None:
     row = db.query(UserSkill).filter_by(user_id=user_id, name=name).first()
     if row is None:
         raise SkillServiceError(f"未安装该技能: {name}")
-    _get_storage().delete_prefix(f"skills/{user_id}/{name}")
+    _get_storage().delete_prefix(f"{user_id}/skills/{name}")
     db.delete(row)
     db.commit()
 

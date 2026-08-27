@@ -30,7 +30,7 @@ def test_save_artifact_success(db, sandbox):
     assert row.conversation_id == 9
     assert row.filename == "报告.pptx" or row.filename == "report.pptx"
     assert row.size == len(b"ppt-bytes")
-    keys = storage.list_keys(f"artifacts/u1/{row.id}/") if row.id else storage.list_keys("artifacts/u1/")
+    keys = storage.list_keys(f"u1/artifacts/{row.id}/") if row.id else storage.list_keys("u1/artifacts/")
     assert keys  # 已上传
 
 
@@ -54,7 +54,7 @@ def test_save_artifact_enforces_count_limit(db, sandbox, monkeypatch):
     from app.core.config import ARTIFACT_MAX_COUNT
     monkeypatch.setattr("app.core.config.ARTIFACT_MAX_COUNT", 1)
     db.add(Artifact(user_id="u1", conversation_id=1, filename="a.bin", size=1,
-                    storage_key="artifacts/u1/x/a.bin"))
+                    storage_key="u1/artifacts/x/a.bin"))
     db.commit()
     tool = make_save_artifact_tool("u1", storage=FakeStorage())
     result = _invoke(tool, "/sessions/conv-9/report.pptx")
