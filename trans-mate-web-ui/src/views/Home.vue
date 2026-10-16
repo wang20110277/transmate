@@ -17,8 +17,12 @@
         <span>{{ t('home.newChat') }}</span>
       </button>
 
-      <!-- 云盘制品入口：点击后右侧主区切换为制品列表，再点或选中会话切回对话 -->
-      <button :class="['cloud-entry-btn', { active: mainView === 'artifacts' }]" @click="toggleArtifacts">
+      <!-- 云盘制品入口：仅登录后可见（制品数据需登录态），点击后右侧主区切换为制品列表，再点或选中会话切回对话 -->
+      <button
+        v-if="userStore.isLoggedIn"
+        :class="['cloud-entry-btn', { active: mainView === 'artifacts' }]"
+        @click="toggleArtifacts"
+      >
         <i class="fas fa-cloud"></i>
         <span>{{ t('home.artifacts') }}</span>
       </button>
@@ -579,7 +583,9 @@ const artifacts = ref<ArtifactItem[]>([]);
 const onlyCurrentConversation = ref<boolean>(true);
 
 // 左栏入口：切换到云盘制品列表；再次点击切回对话
+// 与 loadArtifacts 保持同一约定——未登录不出制品（入口本就已隐藏，这里兜底）
 const toggleArtifacts = () => {
+  if (!userStore.isLoggedIn) return;
   if (mainView.value === 'artifacts') {
     mainView.value = 'chat';
     return;
@@ -587,6 +593,13 @@ const toggleArtifacts = () => {
   mainView.value = 'artifacts';
   loadArtifacts();
 };
+
+// 未登录时把主视图收回对话：入口隐藏后，不能再停在打不开的云盘面板上。
+// 登出本身会整页重载，这里兜的是另一条路径——token 过期时 fetchUserInfo
+// 走 clearAuth()，isLoggedIn 变 false 而 mainView 还停在 artifacts。
+watch(() => userStore.isLoggedIn, (ok) => {
+  if (!ok) mainView.value = 'chat';
+});
 
 // 新建/选中会话时回到对话视图
 const onNewConversation = () => {
