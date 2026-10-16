@@ -23,22 +23,22 @@
       :disabled="disabled"
       autocomplete="off"
       @input="onInput"
-      @keydown.enter.exact.prevent="$emit('send')"
+      @keydown.enter.exact.prevent="onEnter"
     ></textarea>
 
+    <!-- 右下角同一位置单控件切换：录音/转写→麦克风；生成中→停止；有文字→发送 -->
     <div class="action-row">
       <button
-        :class="['action-btn', 'mic', { recording: isRecording, transcribing: isTranscribing }]"
-        :disabled="disabled"
-        :title="micTitle"
-        @click="$emit('toggleRecording')"
+        v-if="controlMode === 'stop'"
+        class="action-btn stop"
+        :title="t('chat.stopGenerate')"
+        @click="$emit('stop')"
       >
-        <span v-if="isTranscribing" class="mini-spinner"></span>
-        <i v-else :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
+        <i class="fas fa-stop"></i>
       </button>
 
       <button
-        v-if="!isProcessing"
+        v-else-if="controlMode === 'send'"
         class="action-btn send"
         :disabled="disabled || !modelValue.trim()"
         :title="t('chat.send')"
@@ -46,8 +46,16 @@
       >
         <i class="fas fa-arrow-up"></i>
       </button>
-      <button v-else class="action-btn stop" :title="t('chat.stopGenerate')" @click="$emit('stop')">
-        <i class="fas fa-stop"></i>
+
+      <button
+        v-else
+        :class="['action-btn', 'mic', { recording: isRecording, transcribing: isTranscribing }]"
+        :disabled="disabled"
+        :title="micTitle"
+        @click="$emit('toggleRecording')"
+      >
+        <span v-if="isTranscribing" class="mini-spinner"></span>
+        <i v-else :class="isRecording ? 'fas fa-stop' : 'fas fa-microphone'"></i>
       </button>
     </div>
   </div>
@@ -81,6 +89,20 @@ const micTitle = computed(() => {
   if (props.isTranscribing) return t('chat.micTranscribing')
   return props.isRecording ? t('chat.micStop') : t('chat.micTitle')
 })
+
+// 右下角控件状态：录音/转写中必须留着麦克风（它是停止控件），
+// 生成中给停止按钮，否则没文字显示麦克风、有文字切成发送按钮。
+const controlMode = computed<'mic' | 'send' | 'stop'>(() => {
+  if (props.isRecording || props.isTranscribing) return 'mic'
+  if (props.isProcessing) return 'stop'
+  return props.modelValue.trim() ? 'send' : 'mic'
+})
+
+// Enter 快捷发送，Shift+Enter 换行；生成中不重复发（此时交给停止按钮）
+const onEnter = () => {
+  if (props.isProcessing) return
+  emit('send')
+}
 
 // 自动增高，最高 160px 后内部滚动
 const adjustHeight = () => {
@@ -184,11 +206,12 @@ onMounted(adjustHeight)
   opacity: 0.6;
 }
 
-/* 底部操作行 */
+/* 底部操作行：按钮统一靠右下角 */
 .action-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 8px;
 }
 
