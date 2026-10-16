@@ -7,7 +7,6 @@ import secrets
 import string
 import json
 import base64
-import hashlib
 from datetime import datetime
 from typing import Optional, Dict, Any, Tuple
 from cryptography.fernet import Fernet
@@ -24,7 +23,6 @@ from app.core.config import (
 )
 from app.models.user import User
 from app.services.user_service import create_user, get_user_by_wechat_openid
-from app.services.auth_service import create_auth_tokens
 import requests
 
 

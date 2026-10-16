@@ -1,7 +1,6 @@
 """UserSkill / Artifact 模型与表结构测试"""
 import pytest
 
-from app.core.database import Base
 from app.models.skill import Artifact, UserSkill
 
 

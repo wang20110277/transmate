@@ -2,7 +2,7 @@
 短信验证码服务模块
 """
 import random
-from typing import Optional, Tuple
+from typing import Tuple
 from app.core.redis import redis_client, RedisKeys, RedisTTL
 
 

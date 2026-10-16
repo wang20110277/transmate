@@ -1,6 +1,5 @@
 """save_artifact 工具:沙箱路径解析/上传/上限/错误文案"""
 import pytest
-from langchain_core.runnables import RunnableConfig
 
 from app.llm.tools.artifact_tool import make_save_artifact_tool
 from app.models.skill import Artifact
@@ -51,7 +50,6 @@ def test_save_artifact_blocks_traversal(db, sandbox):
 
 @pytest.mark.unit
 def test_save_artifact_enforces_count_limit(db, sandbox, monkeypatch):
-    from app.core.config import ARTIFACT_MAX_COUNT
     monkeypatch.setattr("app.core.config.ARTIFACT_MAX_COUNT", 1)
     db.add(Artifact(user_id="u1", conversation_id=1, filename="a.bin", size=1,
                     storage_key="u1/artifacts/x/a.bin"))

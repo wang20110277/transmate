@@ -3,7 +3,6 @@ harness 包骨架测试：抽象接口、事件常量与工厂单例
 """
 import pytest
 
-from app.llm.harness import get_agent_harness
 from app.llm.harness.base import AgentHarness
 from app.llm.harness import events
 

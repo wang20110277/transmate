@@ -80,7 +80,6 @@ def test_user_agent_assembles_with_materialized_skills(workspace, db):
 @pytest.mark.integration
 def test_sandbox_file_tools_read_write_and_traversal_denied(workspace, db):
     tmp_path, storage = workspace
-    from deepagents.backends.filesystem import FilesystemBackend
 
     import app.llm.harness.deep_agent_harness as dah
 

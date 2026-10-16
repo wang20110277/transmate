@@ -23,7 +23,7 @@ interface Message {
   toolCalls?: ToolCallBlock[];
   // 智能体扩展：正在流式输出中
   streaming?: boolean;
-  // 智能体扩展：该条消息使用的智能体（base_agent 等）
+  // 智能体扩展：该条消息使用的智能体（deep_agent / stock_data_expert）
   agent?: string;
   // deep agent 扩展：任务计划（write_todos）
   todos?: TodoItem[]
@@ -65,18 +65,6 @@ interface ConversationMessage {
   created_at?: string;
 }
 
-interface WebSocketMessage {
-  type: string;
-  data: string;
-  timestamp: number;
-}
-
-interface ParsedWebSocketMessage {
-  // 纯文本格式的消息内容
-  text: string;
-  timestamp?: number;
-}
-
 export type {
   Message,
   ToolCallBlock,
@@ -84,7 +72,5 @@ export type {
   TodoItem,
   AgentEvent,
   Conversation,
-  ConversationMessage,
-  WebSocketMessage,
-  ParsedWebSocketMessage
+  ConversationMessage
 };
