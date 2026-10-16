@@ -177,3 +177,50 @@ def test_ws_turn_limit_uses_its_own_threshold(monkeypatch):
     with pytest.raises(Exception) as exc:
         ratelimit.enforce_ws_turn_limit("u1")
     assert exc.value.status_code == 429
+
+
+# ==================== 通用消息体不被 chat.MessageResponse 覆盖 ====================
+#
+# app/schemas/__init__.py 曾同时 re-export auth 与 chat 两个同名 MessageResponse，
+# 后导入的 chat 版本（要求 id/conversation_id/role）覆盖了 auth 的通用消息体，
+# 于是 MessageResponse(message=...) 构造即校验失败：
+# 登出 / 改密码 / 改昵称三个接口全部 500（写入已发生，响应却报错）。
+
+
+def test_logout_returns_generic_message_envelope(client, user):
+    resp = client.post(
+        "/api/auth/logout", json={"device_id": "test-device"}, headers=_headers()
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("message")
+
+
+def test_change_password_returns_generic_message_envelope(client, user):
+    resp = client.post(
+        "/api/auth/password/change",
+        json={"new_password": "newpass123", "confirm_password": "newpass123"},
+        headers=_headers(),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("message")
+
+
+def test_update_nickname_persists_and_returns_envelope(client, db, user):
+    resp = client.put(
+        "/api/auth/user/nickname", json={"nickname": "新昵称"}, headers=_headers()
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("message")
+
+    db.expire_all()
+    from app.models.user import User
+
+    refreshed = db.query(User).filter(User.id == user.id).first()
+    assert refreshed.nickname == "新昵称"
+
+
+def test_chat_message_response_still_importable_from_its_own_module():
+    """会话消息模型未被误删，仍从其所属模块导出"""
+    from app.schemas.chat import MessageResponse as ChatMessageResponse
+
+    assert "conversation_id" in ChatMessageResponse.model_fields

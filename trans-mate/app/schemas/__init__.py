@@ -16,11 +16,14 @@ from app.schemas.auth import (
     ChangePasswordRequest,
 )
 from app.schemas.user import UserInfoResponse
+# 注意：app.schemas.chat 里也有一个同名的 MessageResponse（会话消息，字段为
+# id/conversation_id/role/content）。此前这里把它一并 re-export，会覆盖掉上面
+# auth 的通用消息体，导致 auth 路由构造 MessageResponse(message=...) 时校验失败，
+# 登出 / 改密码 / 改昵称三个接口全部 500。聊天消息模型请直接从 app.schemas.chat 导入。
 from app.schemas.chat import (
     ConversationCreate,
     ConversationUpdate,
     ConversationResponse,
-    MessageResponse,
 )
 
 __all__ = [
@@ -42,5 +45,4 @@ __all__ = [
     "ConversationCreate",
     "ConversationUpdate",
     "ConversationResponse",
-    "MessageResponse",
 ]
