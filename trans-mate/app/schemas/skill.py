@@ -29,7 +29,8 @@ class InstalledResponse(BaseModel):
 
 
 class InstallRequest(BaseModel):
-    user_id: str
+    """安装技能请求（user_id 由登录态推导，不接受客户端指定）"""
+
     name: str
 
 

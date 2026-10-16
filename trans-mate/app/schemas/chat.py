@@ -8,9 +8,11 @@ from typing import Optional
 
 
 class ConversationCreate(BaseModel):
-    """创建会话请求"""
+    """创建会话请求
 
-    user_id: str = Field(..., description="用户ID")
+    user_id 由登录态推导（Depends(get_current_user)），不接受客户端指定。
+    """
+
     title: str = Field("新会话", description="会话标题")
 
 

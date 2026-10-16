@@ -47,3 +47,41 @@ def db(monkeypatch):
     session = Session()
     yield session
     session.close()
+
+
+@pytest.fixture
+def allow_any_token(monkeypatch):
+    """鉴权替身：任意 wire token 视为有效（测试不依赖 Redis 会话存储）
+
+    生产环境中 token 有效性由 Redis 中的 auth:session 决定。
+    返回鉴权头工厂，用法：headers=allow_any_token(user)
+    """
+    monkeypatch.setattr(
+        "app.services.auth_service.verify_access_token",
+        lambda user_id, device_id, token: True,
+    )
+
+    def _factory(user) -> dict:
+        return {"Authorization": f"Bearer {user.id}:test-device:test-token"}
+
+    return _factory
+
+
+def create_user(db, user_id: str = "u1", **kwargs):
+    """在测试库中造一个用户并返回（默认 status=1 正常）"""
+    from app.models.user import User
+
+    fields = dict(
+        user_id=user_id,
+        nickname=f"用户{user_id}",
+        register_source="PASSWORD",
+        status=1,
+        is_password_set=1,
+        role="user",
+    )
+    fields.update(kwargs)
+    user = User(**fields)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

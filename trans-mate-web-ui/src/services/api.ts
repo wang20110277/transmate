@@ -238,13 +238,13 @@ export interface ConversationMessage {
 }
 
 // 获取用户会话列表
-export const listConversations = (userId: string): Promise<AxiosResponse<Conversation[]>> => {
-  return apiClient.get('/api/conversations', { params: { user_id: userId } })
+export const listConversations = (): Promise<AxiosResponse<Conversation[]>> => {
+  return apiClient.get('/api/conversations')
 }
 
 // 创建新会话
-export const createConversation = (userId: string, title?: string): Promise<AxiosResponse<Conversation>> => {
-  return apiClient.post('/api/conversations', { user_id: userId, title: title || '新会话' })
+export const createConversation = (title?: string): Promise<AxiosResponse<Conversation>> => {
+  return apiClient.post('/api/conversations', { title: title || '新会话' })
 }
 
 // 重命名会话

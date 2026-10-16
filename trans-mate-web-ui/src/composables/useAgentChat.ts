@@ -1,5 +1,4 @@
-import { ref, onUnmounted, toValue } from 'vue'
-import type { MaybeRefOrGetter } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import type { AgentEvent, Conversation, Message, ToolCallBlock } from '@/types'
 import { t } from '@/i18n'
 import {
@@ -10,7 +9,6 @@ import {
 } from '@/services/api'
 
 interface UseAgentChatOptions {
-  userId: MaybeRefOrGetter<string>
   /** 一条回复完成（含停止/出错前已生成内容）后的回调，用于语音播报等 */
   onReplyComplete?: (content: string) => void
 }
@@ -20,7 +18,6 @@ interface UseAgentChatOptions {
  * 管理 WebSocket 事件流（流式 token / 工具调用块）、多会话切换与发送/停止。
  */
 export function useAgentChat(options: UseAgentChatOptions) {
-  const { userId } = options
 
   const dialogue = ref<Message[]>([])
   const conversations = ref<Conversation[]>([])
@@ -155,7 +152,10 @@ export function useAgentChat(options: UseAgentChatOptions) {
       // 浏览器环境用当前域名（走 vite 代理）；Electron file:// 环境 host 为空，回退到直连后端
       || `${protocol}${window.location.host
         || `${import.meta.env.VITE_WS_HOST || 'localhost'}:${import.meta.env.VITE_WS_PORT || '8000'}`}`
-    const wsUrl = `${host}/ws?user_id=${encodeURIComponent(toValue(userId))}`
+    // 鉴权：token 走 query（浏览器 WebSocket 无法自定义 header）。
+    // 服务端只认 token，不再接受客户端自称的 user_id。
+    const token = localStorage.getItem('token') || ''
+    const wsUrl = `${host}/ws?token=${encodeURIComponent(token)}`
     socket.value = new WebSocket(wsUrl)
     socket.value.onopen = () => {
       isConnected.value = true
@@ -203,7 +203,6 @@ export function useAgentChat(options: UseAgentChatOptions) {
         type: 'chat_message',
         message,
         conversation_id: currentConversationId.value,
-        user_id: toValue(userId),
         timestamp: Date.now()
       })
     )
@@ -218,7 +217,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
 
   const refreshConversations = async () => {
     try {
-      const response = await listConversations(toValue(userId))
+      const response = await listConversations()
       conversations.value = response.data
     } catch (err) {
       console.error('获取会话列表失败:', err)
@@ -274,7 +273,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
 
   const createNewConversation = async (): Promise<Conversation | null> => {
     try {
-      const response = await createConversation(toValue(userId))
+      const response = await createConversation()
       await refreshConversations()
       return response.data
     } catch (err) {

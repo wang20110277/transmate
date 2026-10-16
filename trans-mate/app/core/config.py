@@ -9,6 +9,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """解析布尔型环境变量：'1/true/yes/on'（忽略大小写）为真。
+
+    直接 os.getenv 拿到的字符串 'false' 在 Python 里是真值，
+    会导致 allow_credentials / 限流开关等配置永远为开。
+    """
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_int(name: str, default: int | None = None) -> int | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw.strip())
+    except ValueError:
+        return default
+
+
 ENVIRONMENT = os.getenv("ENVIRONMENT")
 DEBUG = os.getenv("DEBUG")
 LOG_LEVEL = os.getenv("LOG_LEVEL")
@@ -62,10 +85,13 @@ TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS")
-CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS")
+CORS_ALLOW_CREDENTIALS = _env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
-RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED")
-RATE_LIMIT_REQUESTS_PER_MINUTE = os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE")
+# 限流：RATE_LIMIT_ENABLED 开启时，按 RATE_LIMIT_REQUESTS_PER_MINUTE/分钟 限制每用户
+RATE_LIMIT_ENABLED = _env_bool("RATE_LIMIT_ENABLED", default=False)
+RATE_LIMIT_REQUESTS_PER_MINUTE = _env_int("RATE_LIMIT_REQUESTS_PER_MINUTE", default=60)
+# WebSocket 每连接每分钟可发起的生成轮数（LLM 成本主入口）
+WS_RATE_LIMIT_TURNS_PER_MINUTE = _env_int("WS_RATE_LIMIT_TURNS_PER_MINUTE", default=10)
 
 SESSION_TIMEOUT = os.getenv("SESSION_TIMEOUT")
 

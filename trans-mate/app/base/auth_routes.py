@@ -3,12 +3,13 @@
 处理登录、注册、Token刷新等认证相关API
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.core.config import WECHAT_LOGIN_ENABLED
 from app.schemas import (
     WechatLoginRequest,
@@ -39,7 +40,6 @@ from app.services.auth_service import (
     create_auth_tokens,
     refresh_auth_tokens,
     logout_user,
-    get_current_user_from_token,
     wire_access_token,
 )
 from app.services.sms_service import (
@@ -460,28 +460,10 @@ async def refresh_token(request: RefreshTokenRequest):
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     request: LogoutRequest,
-    authorization: str = Header(..., alias="Authorization"),
-    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    """
-    用户登出
-
-    - 删除Redis中的token
-    """
-    # 解析token获取user_id
-    token = authorization.replace("Bearer ", "")
-    parts = token.split(":")
-    if len(parts) != 3:
-        raise HTTPException(status_code=401, detail="无效的token")
-
-    try:
-        user_id = int(parts[0])
-    except ValueError:
-        raise HTTPException(status_code=401, detail="无效的token")
-
-    # 执行登出
-    logout_user(user_id, request.device_id)
-
+    """登出：删除当前设备在 Redis 中的 session 与 refresh token"""
+    logout_user(user.id, request.device_id)
     return MessageResponse(message="登出成功")
 
 
@@ -489,20 +471,8 @@ async def logout(
 
 
 @router.get("/me", response_model=UserInfoResponse)
-async def get_me(
-    authorization: str = Header(..., alias="Authorization"),
-    db: Session = Depends(get_db),
-):
-    """
-    获取当前用户信息
-
-    - 需要Authorization header
-    """
-    user = get_current_user_from_token(db, authorization)
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="未登录或token已过期")
-
+async def get_me(user: User = Depends(get_current_user)):
+    """获取当前登录用户信息（身份来自 Authorization header）"""
     return UserInfoResponse(
         id=user.id,
         user_id=user.user_id,
@@ -520,19 +490,10 @@ async def get_me(
 @router.post("/password/change", response_model=MessageResponse)
 async def change_password(
     request: ChangePasswordRequest,
-    authorization: str = Header(..., alias="Authorization"),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    """
-    修改密码
-
-    - 无需验证旧密码，直接设置新密码
-    """
-    user = get_current_user_from_token(db, authorization)
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="未登录或token已过期")
-
+    """修改密码：无需验证旧密码，直接设置新密码（会强制全部设备下线）"""
     # 验证新密码和确认密码
     if request.new_password != request.confirm_password:
         raise HTTPException(status_code=400, detail="两次密码不一致")
@@ -555,20 +516,10 @@ class UpdateNicknameRequest(BaseModel):
 @router.put("/user/nickname", response_model=MessageResponse)
 async def update_nickname(
     request: UpdateNicknameRequest,
-    authorization: str = Header(..., alias="Authorization"),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    """
-    更新用户昵称
-
-    - nickname: 新昵称，最多10个字符
-    - 支持中英文、数字和表情符号
-    """
-    user = get_current_user_from_token(db, authorization)
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="未登录或token已过期")
-
+    """更新昵称：最多10个字符，支持中英文、数字和表情"""
     # 验证昵称长度（考虑emoji占2个字符显示宽度）
     if len(request.nickname) > 10:
         raise HTTPException(status_code=400, detail="昵称最多10个字符")

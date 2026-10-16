@@ -88,8 +88,7 @@ import { useUserStore } from '@/stores/user'
 const { t } = useI18n()
 const userStore = useUserStore()
 
-// 适配说明：stores/user.ts 未在顶层导出 user_id，经 userInfo?.user_id 取
-const userId = computed(() => userStore.userInfo?.user_id || '')
+// 身份由服务端从 token 推导，前端不再传 user_id（后端已拒绝该参数）
 
 const registry = ref<RegistryItem[]>([])
 const installed = ref<InstalledItem[]>([])
@@ -108,13 +107,13 @@ const filteredRegistry = computed(() => {
 })
 
 async function loadAll() {
-  if (!userId.value) return
+  if (!userStore.isLoggedIn) return
   loadingRegistry.value = true
   loadingInstalled.value = true
   try {
     ;[registry.value, installed.value] = await Promise.all([
-      listRegistry(userId.value),
-      listInstalled(userId.value),
+      listRegistry(),
+      listInstalled(),
     ])
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || t('skills.loadFailed'))
@@ -137,7 +136,7 @@ async function onRefresh() {
 async function onInstall(name: string) {
   pending.value = name
   try {
-    await installSkill(userId.value, name)
+    await installSkill(name)
     ElMessage.success(t('skills.installDone', { name }))
     await loadAll()
   } catch (e: any) {
@@ -150,7 +149,7 @@ async function onInstall(name: string) {
 async function onUninstall(name: string) {
   pending.value = name
   try {
-    await uninstallSkill(userId.value, name)
+    await uninstallSkill(name)
     ElMessage.success(t('skills.uninstallDone', { name }))
     await loadAll()
   } catch (e: any) {

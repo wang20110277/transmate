@@ -1,5 +1,8 @@
 """
 WebSocket 智能体协议集成测试（内存 sqlite + 伪造流式生成器，不依赖 LLM/外部网络）
+
+鉴权约定：身份来自 query 参数 token（浏览器 WebSocket 无法带 header）。
+未带 token 的连接按匿名处理（不建会话、不落库）；带无效 token 直接拒绝。
 """
 import json
 
@@ -8,11 +11,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
 from app.core.database import Base
-from conftest import make_sqlite_engine
+from conftest import create_user, make_sqlite_engine
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, allow_any_token):
+    """返回 (TestClient, engine, user)；user 已按其 token 可登录"""
     from app.models.user import User  # noqa: F401
     from app.models.conversation import Conversation, ChatMessage  # noqa: F401
 
@@ -24,8 +28,16 @@ def client(monkeypatch):
     monkeypatch.setattr(main_module, "SessionLocal", TestSession)
     monkeypatch.setattr(main_module, "init_db", lambda: None)
 
+    db = TestSession()
+    user = create_user(db, "u1")
+    db.close()
+
     with TestClient(main_module.app) as test_client:
-        yield test_client, engine
+        yield test_client, engine, user
+
+
+def _ws_url(user) -> str:
+    return f"/ws?token={user.id}:test-device:test-token"
 
 
 def collect_until_done(ws, expected_type="done"):
@@ -39,8 +51,8 @@ def collect_until_done(ws, expected_type="done"):
 
 
 @pytest.mark.integration
-def test_ws_full_flow_with_auto_conversation(client):
-    test_client, engine = client
+def test_ws_full_flow_with_auto_conversation(client, monkeypatch):
+    test_client, engine, user = client
 
     seen_threads = []
 
@@ -61,9 +73,9 @@ def test_ws_full_flow_with_auto_conversation(client):
     original = main_module.stream_agent_events
     main_module.stream_agent_events = fake_stream
     try:
-        with test_client.websocket_connect("/ws?user_id=u1") as ws:
+        with test_client.websocket_connect(_ws_url(user)) as ws:
             # 第一条消息：不带 conversation_id，应自动建会话
-            ws.send_text(json.dumps({"type": "chat_message", "message": "你好", "user_id": "u1"}))
+            ws.send_text(json.dumps({"type": "chat_message", "message": "你好"}))
             events = collect_until_done(ws)
 
             types = [e["type"] for e in events]
@@ -90,6 +102,7 @@ def test_ws_full_flow_with_auto_conversation(client):
         assert len(messages) == 4
         assert [m.role for m in messages] == ["user", "assistant", "user", "assistant"]
         assert db.get(Conversation, conversation_id).title == "你好"
+        assert db.get(Conversation, conversation_id).user_id == user.user_id
         # 两轮对话各自携带 conv-{conversation_id} 的 thread 标识
         assert seen_threads == [f"conv-{conversation_id}"] * 2
         db.close()
@@ -99,7 +112,7 @@ def test_ws_full_flow_with_auto_conversation(client):
 
 @pytest.mark.integration
 def test_ws_stop_generation(client):
-    test_client, engine = client
+    test_client, engine, user = client
     import asyncio
 
     async def slow_stream(history, thread_id, user_id=None):
@@ -111,8 +124,8 @@ def test_ws_stop_generation(client):
     original = main_module.stream_agent_events
     main_module.stream_agent_events = slow_stream
     try:
-        with test_client.websocket_connect("/ws?user_id=u1") as ws:
-            ws.send_text(json.dumps({"type": "chat_message", "message": "慢问题", "user_id": "u1"}))
+        with test_client.websocket_connect(_ws_url(user)) as ws:
+            ws.send_text(json.dumps({"type": "chat_message", "message": "慢问题"}))
             # 收到 conversation_created 与首个 token
             first = json.loads(ws.receive_text())
             assert first["type"] == "conversation_created"
@@ -130,7 +143,7 @@ def test_ws_stop_generation(client):
 @pytest.mark.integration
 def test_ws_plain_text_compat(client):
     """纯文本消息应被兼容解析为 chat_message"""
-    test_client, engine = client
+    test_client, engine, user = client
 
     async def fake_stream(history, thread_id, user_id=None):
         yield {"type": "token", "content": "ok"}
@@ -140,9 +153,88 @@ def test_ws_plain_text_compat(client):
     original = main_module.stream_agent_events
     main_module.stream_agent_events = fake_stream
     try:
-        with test_client.websocket_connect("/ws?user_id=u1") as ws:
+        with test_client.websocket_connect(_ws_url(user)) as ws:
             ws.send_text("纯文本消息")
             events = collect_until_done(ws)
             assert events[-1]["type"] == "done"
+    finally:
+        main_module.stream_agent_events = original
+
+
+@pytest.mark.integration
+def test_ws_rejects_invalid_token(client):
+    """无效 token（用户不存在）不得建立会话：收到 error 后连接被关闭"""
+    test_client, engine, user = client
+    # 用不存在的 user_id：确保走的是"用户不存在"分支而非鉴权替身放行
+    missing_id = user.id + 9999
+    with test_client.websocket_connect(f"/ws?token={missing_id}:bad:bad") as ws:
+        event = json.loads(ws.receive_text())
+        assert event["type"] == "error"
+        assert "未登录" in event["message"]
+
+
+@pytest.mark.integration
+def test_ws_anonymous_message_not_persisted(client, monkeypatch):
+    """未带 token：匿名连接不建会话、不落库，thread 断开即焚"""
+    test_client, engine, _ = client
+
+    async def fake_stream(history, thread_id, user_id=None):
+        assert user_id is None
+        yield {"type": "token", "content": "匿名回复"}
+        yield {"type": "done", "content": "匿名回复"}
+
+    import main as main_module
+    original = main_module.stream_agent_events
+    main_module.stream_agent_events = fake_stream
+    try:
+        with test_client.websocket_connect("/ws") as ws:
+            ws.send_text(json.dumps({"type": "chat_message", "message": "匿名提问"}))
+            events = collect_until_done(ws)
+            # 匿名分支不应产生 conversation_created
+            assert [e["type"] for e in events] == ["token", "done"]
+
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        from app.models.conversation import Conversation
+        assert db.query(Conversation).count() == 0
+        db.close()
+    finally:
+        main_module.stream_agent_events = original
+
+
+@pytest.mark.integration
+def test_ws_rejects_other_users_conversation(client):
+    """携带他人 conversation_id 应被拒绝，不写入对方会话"""
+    test_client, engine, user = client
+
+    async def fake_stream(history, thread_id, user_id=None):
+        yield {"type": "done", "content": "不该到达"}
+
+    import main as main_module
+    original = main_module.stream_agent_events
+    main_module.stream_agent_events = fake_stream
+    try:
+        # 先造一个属于 u2 的会话
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        from app.models.conversation import Conversation
+        from app.services import chat_service
+        other_user = create_user(db, "u2")
+        conv = chat_service.create_conversation(db, other_user.user_id, "他人会话")
+        conv_id = conv.id
+        db.close()
+
+        with test_client.websocket_connect(_ws_url(user)) as ws:
+            ws.send_text(json.dumps({
+                "type": "chat_message", "message": "越权写入", "conversation_id": conv_id,
+            }))
+            event = json.loads(ws.receive_text())
+            assert event["type"] == "error"
+            assert "无权访问" in event["message"]
+
+        db = Session()
+        from app.models.conversation import ChatMessage
+        assert db.query(ChatMessage).filter_by(conversation_id=conv_id).count() == 0
+        db.close()
     finally:
         main_module.stream_agent_events = original

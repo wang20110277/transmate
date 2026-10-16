@@ -291,7 +291,6 @@ const isSpeaking = ref<boolean>(false);
 // 当前正在朗读的消息索引（用于消息级喇叭按钮高亮）
 const speakingIndex = ref<number | null>(null);
 let currentAudio: HTMLAudioElement | null = null;
-const userId = ref<string>('anonymous');
 
 // 推荐卡片文案随界面语言切换
 const suggestionIcons = ['fa-language', 'fa-cloud-sun', 'fa-search', 'fa-chart-line'];
@@ -386,7 +385,6 @@ const {
   newConversation,
   removeConversation
 } = useAgentChat({
-  userId,
   onReplyComplete: (content) => {
     if (ttsEnabled.value) {
       // 定位刚完成的 assistant 消息索引，让对应喇叭按钮高亮
@@ -495,14 +493,12 @@ const applyUserIdentity = () => {
 
 const onLoginSuccess = () => {
   loginDialogOpen.value = false;
-  userId.value = userStore.userInfo?.user_id || 'anonymous';
   applyUserIdentity();
 };
 
 const onLogout = async () => {
   userMenuOpen.value = false;
   await userStore.logoutUser();
-  userId.value = 'anonymous';
   applyUserIdentity();
   ElMessage.success(t('home.logoutSuccess'));
 };
@@ -569,11 +565,11 @@ const onSelectConversation = (conversationId: number) => {
 };
 
 const loadArtifacts = async () => {
-  if (!userId.value) return;
+  if (!userStore.isLoggedIn) return;
   artifactsLoading.value = true;
   try {
     const convId = onlyCurrentConversation.value ? currentConversationId.value : undefined;
-    const data = await listArtifacts(userId.value, convId ?? undefined, artifactsView.value === 'recycled');
+    const data = await listArtifacts(convId ?? undefined, artifactsView.value === 'recycled');
     artifacts.value = data.items;
   } finally {
     artifactsLoading.value = false;
@@ -588,12 +584,12 @@ const switchArtifactsView = (view: 'active' | 'recycled') => {
 };
 
 const archiveOne = async (a: ArtifactItem) => {
-  await archiveArtifact(a.id, userId.value);
+  await archiveArtifact(a.id);
   loadArtifacts();
 };
 
 const restoreOne = async (a: ArtifactItem) => {
-  await restoreArtifact(a.id, userId.value);
+  await restoreArtifact(a.id);
   loadArtifacts();
 };
 
@@ -607,12 +603,12 @@ const purgeOne = async (a: ArtifactItem) => {
   } catch {
     return; // 取消
   }
-  await purgeArtifact(a.id, userId.value);
+  await purgeArtifact(a.id);
   loadArtifacts();
 };
 
 const downloadArtifact = async (a: ArtifactItem) => {
-  const url = await getArtifactDownloadUrl(a.id, userId.value);
+  const url = await getArtifactDownloadUrl(a.id);
   // 预签名 URL 带 Content-Disposition: attachment,动态 a 标签静默触发下载,不弹空白新窗
   const link = document.createElement('a');
   link.href = url;
@@ -644,9 +640,6 @@ onMounted(async () => {
   userStore.initFromStorage();
   if (userStore.token && !userStore.userInfo) {
     await userStore.fetchUserInfo();
-  }
-  if (userStore.userInfo) {
-    userId.value = localStorage.getItem('user_id') || userStore.userInfo.user_id;
   }
 
   connect();

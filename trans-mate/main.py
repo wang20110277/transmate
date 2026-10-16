@@ -9,12 +9,14 @@ import traceback
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.ratelimit import enforce_ws_turn_limit
 from app.llm.streaming import stream_agent_events, build_history_messages
 from app.llm.harness import get_agent_harness
 from app.core.database import init_db, SessionLocal
+from app.core.security import authenticate_token
 from app.core.config import ALLOWED_ORIGINS, CORS_ALLOW_CREDENTIALS
 from app.base.auth_routes import router as auth_router
 from app.base.chat_routes import router as chat_router
@@ -147,8 +149,25 @@ async def run_agent_stream(
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    # 匿名连接的临时 thread:连接内多轮共享 checkpoint 上下文,断开即焚
+
+    # 鉴权：token 通过 query 传递（浏览器 WebSocket 无法自定义 header）。
+    # 身份一律由 token 推导，忽略客户端自称的 user_id，杜绝冒充任意用户。
     anon_thread = f"anon-{uuid.uuid4().hex[:8]}"
+    ws_user_id: str | None = None
+    token = websocket.query_params.get("token")
+    if token:
+        db = SessionLocal()
+        try:
+            user = authenticate_token(db, f"Bearer {token}")
+            ws_user_id = user.user_id if user else None
+        finally:
+            db.close()
+        if ws_user_id is None:
+            await _send_event(websocket, {"type": "error", "message": "未登录或token已过期"})
+            await websocket.close(code=4401)
+            return
+    # 未带 token：匿名连接，thread 断开即焚，不落库（沿用原有匿名语义）
+
     generation_task: asyncio.Task | None = None
     try:
         while True:
@@ -181,14 +200,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             conversation_id = payload.get("conversation_id")
             if not conversation_id:
-                ws_user = str(payload.get("user_id") or "anonymous")
-                if ws_user == "anonymous":
+                if ws_user_id is None:
                     # 匿名:不建会话、不落库,用连接级 thread 跑 ephemeral 轮次
                     conversation_id = None
                 else:
                     db = SessionLocal()
                     try:
-                        conversation = chat_service.create_conversation(db, ws_user)
+                        conversation = chat_service.create_conversation(db, ws_user_id)
                         conversation_id = conversation.id
                     finally:
                         db.close()
@@ -199,8 +217,31 @@ async def websocket_endpoint(websocket: WebSocket):
                             "conversation_id": conversation_id,
                         },
                     )
+            else:
+                # 显式携带 conversation_id 时必须校验归属，否则可向他人会话写入消息
+                if ws_user_id is not None:
+                    db = SessionLocal()
+                    try:
+                        conv = chat_service.get_conversation(db, conversation_id)
+                    finally:
+                        db.close()
+                    if not conv or conv.user_id != ws_user_id:
+                        await _send_event(
+                            websocket, {"type": "error", "message": "会话不存在或无权访问"}
+                        )
+                        continue
 
             round_thread = f"conv-{conversation_id}" if conversation_id else anon_thread
+
+            # 限流：LLM 成本主入口，按登录用户（或匿名连接）限制每分钟生成轮次
+            try:
+                enforce_ws_turn_limit(ws_user_id or f"anon:{id(websocket)}")
+            except HTTPException as exc:
+                await _send_event(
+                    websocket, {"type": "error", "message": exc.detail}
+                )
+                continue
+
             generation_task = asyncio.create_task(
                 run_agent_stream(websocket, user_message, conversation_id, round_thread)
             )
