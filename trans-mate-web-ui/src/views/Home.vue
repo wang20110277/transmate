@@ -269,7 +269,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessageBox } from 'element-plus';
 import { useUserStore } from '@/stores/user';
 import { useI18n } from '@/i18n';
 import ChatSidebar from '../components/agent/ChatSidebar.vue';
@@ -390,7 +390,6 @@ const {
   isProcessing,
   processingStatus,
   connect,
-  disconnect,
   sendMessage: sendChatMessage,
   stopGeneration,
   refreshConversations,
@@ -520,26 +519,22 @@ const handleNicknameSuccess = (nickname: string) => {
   }
 };
 
-// 切换用户视角（登录/退出）：立即启用新会话（清屏），WS 按新 user_id 重连 + 会话/制品列表刷新
-const applyUserIdentity = () => {
-  newConversation();          // 停止生成 + 清空对话 + currentConversationId 置空
-  mainView.value = 'chat';    // 若在云盘/回收站视图，切回对话视图
-  disconnect();
-  connect();
-  refreshConversations();
-  loadArtifacts();
-};
-
+// 登录成功：整页重载，让 userInfo / 会话 / 制品 / WS 全部按新身份重建。
+// 不能只做应用内的局部刷新：user store 的 token 是从 localStorage 派生的
+// computed（无响应式依赖 → 首次取值后不再重算），登录写入的新 token 不会让它
+// 失效，fetchUserInfo 读到空 token 直接返回，登录后个人信息就不展示。
 const onLoginSuccess = () => {
   loginDialogOpen.value = false;
-  applyUserIdentity();
+  location.reload();
 };
 
+// 退出登录：整页重载，清掉上一位用户残留的视图状态。
+// 否则 refreshConversations 在 401 时只打日志、不清理 conversations，
+// 旧会话列表会继续留在侧栏，看起来像"历史对话没清空"。
 const onLogout = async () => {
   userMenuOpen.value = false;
   await userStore.logoutUser();
-  applyUserIdentity();
-  ElMessage.success(t('home.logoutSuccess'));
+  location.reload();
 };
 
 // 切换界面语言：i18n 模块内持久化并即时生效
