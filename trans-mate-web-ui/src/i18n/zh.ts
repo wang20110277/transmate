@@ -35,6 +35,7 @@ export const zh = {
     connHint: '修改服务地址后自动重载页面',
     login: '登录',
     logout: '退出登录',
+    setNickname: '设置昵称',
     loginTitle: '登录 TransMate',
     registerTitle: '注册 TransMate 账号',
     phoneLabel: '手机号',

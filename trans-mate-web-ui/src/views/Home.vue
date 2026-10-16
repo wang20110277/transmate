@@ -60,8 +60,13 @@
         <div v-if="userMenuOpen" class="user-popover" @click.stop>
           <template v-if="userStore.isLoggedIn">
             <div class="pop-user">
-              <div class="pop-user-name">{{ userStore.userInfo?.nickname || maskedPhone || userStore.userInfo?.user_id }}</div>
-              <div v-if="maskedPhone" class="pop-user-phone">{{ maskedPhone }}</div>
+              <div class="pop-user-name">{{ displayName }}</div>
+              <!-- 名字本身已是手机号时不再重复显示一行 -->
+              <div v-if="showPhoneLine" class="pop-user-phone">{{ maskedPhone }}</div>
+              <button class="pop-nickname" @click="showNicknameDialog = true">
+                <i class="fas fa-pen"></i>
+                <span>{{ t('home.setNickname') }}</span>
+              </button>
             </div>
             <div class="pop-divider"></div>
           </template>
@@ -251,6 +256,13 @@
 
     <!-- 登录弹框（未登录时由左下角入口打开） -->
     <LoginDialog v-model="loginDialogOpen" @success="onLoginSuccess" />
+
+    <!-- 昵称修改弹框（偏好浮层「设置昵称」打开） -->
+    <NicknameEditDialog
+      v-model="showNicknameDialog"
+      :current-nickname="userStore.userInfo?.nickname ?? undefined"
+      @success="handleNicknameSuccess"
+    />
   </div>
 </template>
 
@@ -264,6 +276,7 @@ import ChatSidebar from '../components/agent/ChatSidebar.vue';
 import MessageList from '../components/agent/MessageList.vue';
 import ChatInput from '../components/agent/ChatInput.vue';
 import LoginDialog from '../components/LoginDialog.vue';
+import NicknameEditDialog from '../components/NicknameEditDialog.vue';
 import { useAgentChat } from '@/composables/useAgentChat';
 import { transcribeAudio, synthesizeSpeech } from '@/services/api';
 import {
@@ -467,19 +480,45 @@ const toggleUserMenu = () => { userMenuOpen.value = !userMenuOpen.value; };
 
 // ===== 登录态（左下角入口 / 弹框登录 / 退出） =====
 const loginDialogOpen = ref<boolean>(false);
-
-// 头像字母：昵称或 user_id 首字符；无头像时显示
-const avatarLetter = computed(() => {
-  const info = userStore.userInfo;
-  if (!info) return '';
-  return (info.nickname || info.user_id || '?').trim().charAt(0).toUpperCase();
-});
+const showNicknameDialog = ref<boolean>(false);
 
 // 手机号脱敏展示（138****8000）
 const maskedPhone = computed(() => {
   const phone = userStore.userInfo?.phone || '';
   return phone ? phone.replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2') : '';
 });
+
+// 浮层里的名字：优先昵称，其次脱敏手机号
+const displayName = computed(() => {
+  const info = userStore.userInfo;
+  if (!info) return '';
+  return (info.nickname || '').trim() || maskedPhone.value || info.user_id || '';
+});
+
+// 是否再单独显示一行手机号：名字已经是手机号时不必重复
+const showPhoneLine = computed(() => {
+  const nickname = (userStore.userInfo?.nickname || '').trim();
+  return !!maskedPhone.value && !!nickname;
+});
+
+// 头像字母：优先昵称首字符；无昵称时用手机号后两位。
+// 不再退到 user_id——那是内部 ID，头像会显示成一个没有意义的字母。
+const avatarLetter = computed(() => {
+  const info = userStore.userInfo;
+  if (!info) return '';
+  const nickname = (info.nickname || '').trim();
+  if (nickname) return nickname.charAt(0).toUpperCase();
+  const phone = (info.phone || '').trim();
+  if (phone.length >= 2) return phone.slice(-2);
+  return (info.user_id || '?').trim().charAt(0).toUpperCase();
+});
+
+// 昵称修改成功：同步本地状态（成功提示由昵称弹框自身给出）
+const handleNicknameSuccess = (nickname: string) => {
+  if (userStore.userInfo) {
+    userStore.userInfo.nickname = nickname;
+  }
+};
 
 // 切换用户视角（登录/退出）：立即启用新会话（清屏），WS 按新 user_id 重连 + 会话/制品列表刷新
 const applyUserIdentity = () => {
@@ -876,6 +915,25 @@ onUnmounted(() => {
   margin-top: 2px;
   font-size: 12px;
   color: var(--color-text-faint);
+}
+
+/* 浮层「设置昵称」入口 */
+.home-layout .pop-nickname {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.home-layout .pop-nickname:hover {
+  color: var(--color-primary);
 }
 
 .home-layout .pop-logout {

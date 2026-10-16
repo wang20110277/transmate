@@ -35,6 +35,7 @@ export const en = {
     connHint: 'The page reloads after changing the server address',
     login: 'Log in',
     logout: 'Sign out',
+    setNickname: 'Set nickname',
     loginTitle: 'Sign in to TransMate',
     registerTitle: 'Create a TransMate account',
     phoneLabel: 'Phone number',

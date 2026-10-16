@@ -59,10 +59,14 @@ def create_user_by_phone(
 
     Returns:
         创建的用户对象
+
+    默认昵称取手机号后 4 位（如 用户0001），与微信注册的
+    '微信用户_xxxxxx' 写法一致——否则用户信息区会因昵称为空而只显示手机号。
     """
     user = User(
         user_id=generate_user_id(),
         phone=phone,
+        nickname=f"用户{phone[-4:]}" if phone else None,
         password_hash=hash_password(password) if password else None,
         is_password_set=1 if password else 0,
         register_source=register_source,
