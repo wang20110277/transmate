@@ -84,6 +84,12 @@ TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN")
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
+# 和风天气：API Host 是账号唯一的请求地址（控制台-设置），且它本身也属于认证要素，
+# 光有 KEY 没有 Host 一样请求不到，所以两者都必须从 .env 读。
+# 凭据ID 只用于在控制台标识凭据，请求时不需要传。
+QWEATHER_API_HOST = os.getenv("QWEATHER_API_HOST")
+QWEATHER_API_KEY = os.getenv("QWEATHER_API_KEY")
+
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = _env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
