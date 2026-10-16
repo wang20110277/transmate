@@ -24,6 +24,7 @@ from app.base.asr_routes import router as asr_router
 from app.base.tts_routes import router as tts_router
 from app.base.skill_routes import router as skill_router
 from app.base.artifact_routes import router as artifact_router
+from app.base.settings_routes import router as settings_router
 from app.services import chat_service
 
 logging.basicConfig(
@@ -80,6 +81,7 @@ app.include_router(asr_router)
 app.include_router(tts_router)
 app.include_router(skill_router)
 app.include_router(artifact_router)
+app.include_router(settings_router)
 
 
 @app.get("/")

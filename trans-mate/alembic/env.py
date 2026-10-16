@@ -3,7 +3,6 @@ Alembic 环境配置文件
 """
 from logging.config import fileConfig
 import sys
-import os
 from pathlib import Path
 
 # 将项目根目录添加到 sys.path
@@ -19,6 +18,7 @@ from app.core.database import Base
 from app.models.user import User  # noqa: F401
 from app.models.conversation import Conversation, ChatMessage  # noqa: F401
 from app.models.skill import UserSkill, Artifact  # noqa: F401
+from app.models.llm_provider import UserLLMProvider  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

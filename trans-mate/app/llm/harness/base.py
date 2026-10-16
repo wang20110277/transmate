@@ -3,7 +3,7 @@ AgentHarness 抽象基类
 上层（streaming/WebSocket）只依赖此接口，未来可替换 harness 实现
 """
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, List
+from typing import AsyncGenerator, List, Optional
 
 from langchain_core.messages import BaseMessage
 
@@ -13,12 +13,16 @@ class AgentHarness(ABC):
 
     @abstractmethod
     def astream(
-        self, history: List[BaseMessage], thread_id: str
+        self,
+        history: List[BaseMessage],
+        thread_id: str,
+        user_id: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
         """驱动 agent 执行一轮，产出归一化事件（见 events.py）。
 
         history 为 DB 拼出的完整消息列表（含本次 user 输入）；
         是否全量注入由实现根据 checkpoint 状态决定。
+        user_id 非空时按该用户的配置启用个性化能力（云工作区/自带模型）。
         实现为 async 生成器函数（async def + yield）。
         """
         raise NotImplementedError

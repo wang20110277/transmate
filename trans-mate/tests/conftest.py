@@ -34,6 +34,7 @@ def db(monkeypatch):
     from app.models.user import User  # noqa: F401
     from app.models.conversation import Conversation, ChatMessage  # noqa: F401
     from app.models.skill import UserSkill, Artifact  # noqa: F401
+    from app.models.llm_provider import UserLLMProvider  # noqa: F401
 
     engine = make_sqlite_engine()
     Base.metadata.create_all(engine)

@@ -37,9 +37,11 @@
         <h1 class="settings-title">{{ currentItem.label }}</h1>
       </header>
 
-      <div :class="['settings-body', { panel: activeKey === 'skills' }]">
+      <div :class="['settings-body', { panel: isPanel }]">
         <!-- 技能分区：嵌入技能管理面板（仓库浏览/搜索/装卸） -->
         <SkillsPanel v-if="activeKey === 'skills'" />
+        <!-- 模型分区：BYOK 供应商管理与模型切换 -->
+        <ModelSettingsPanel v-else-if="activeKey === 'models'" />
         <div v-else class="placeholder-card">
           <span class="placeholder-icon">
             <i :class="['fas', currentItem.icon]"></i>
@@ -58,6 +60,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from '@/i18n'
 import SkillsPanel from './Skills.vue'
+import ModelSettingsPanel from '@/components/settings/ModelSettingsPanel.vue'
 
 interface MenuItem {
   key: string
@@ -73,11 +76,15 @@ const { t } = useI18n()
 const itemMetas: { key: string; icon: string }[] = [
   { key: 'general', icon: 'fa-cog' },
   { key: 'appearance', icon: 'fa-palette' },
+  { key: 'models', icon: 'fa-microchip' },
   { key: 'memory', icon: 'fa-brain' },
   { key: 'skills', icon: 'fa-bolt' },
   { key: 'rag', icon: 'fa-database' },
   { key: 'mcp', icon: 'fa-plug' }
 ]
+
+// 嵌入面板类分区：内容块级铺满，不走居中占位空态
+const PANEL_KEYS = ['skills', 'models']
 
 // 左栏菜单：基础设置 / 能力设置 两组
 const menuGroups = computed<{ key: string; label: string; items: MenuItem[] }[]>(() => [
@@ -104,6 +111,8 @@ const menuGroups = computed<{ key: string; label: string; items: MenuItem[] }[]>
 ])
 
 const activeKey = ref('general')
+
+const isPanel = computed(() => PANEL_KEYS.includes(activeKey.value))
 
 const currentItem = computed<MenuItem>(() => {
   for (const group of menuGroups.value) {

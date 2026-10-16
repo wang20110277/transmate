@@ -8,19 +8,19 @@ import os
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, List, Optional
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from sqlalchemy.orm import Session
 
-from app.core.config import (
-    CHECKPOINT_DB_PATH,
-    DEFAULT_API_KEY,
-    DEFAULT_API_URL,
-    DEFAULT_MODEL,
-    DEFAULT_PROVIDER,
-)
+from app.core.config import CHECKPOINT_DB_PATH
 from app.llm.harness.base import AgentHarness
+from app.llm.model_config import (
+    SOURCE_USER,
+    build_chat_model,
+    config_fingerprint,
+    env_config,
+    resolve_config,
+)
 from app.llm.harness.events import (
     EVENT_AGENT_START,
     EVENT_PLAN_UPDATE,
@@ -113,14 +113,8 @@ def _build_backend(user_id: str):
 
 
 def _build_model():
-    """创建共享 BaseChatModel（Qwen OpenAI 兼容接口，配置与 ModelPool 相同）"""
-    return init_chat_model(
-        model=DEFAULT_MODEL,
-        model_provider=DEFAULT_PROVIDER,
-        base_url=DEFAULT_API_URL,
-        api_key=DEFAULT_API_KEY,
-        temperature=0.1,
-    )
+    """平台默认 BaseChatModel（未经用户 BYOK 配置时使用）"""
+    return build_chat_model(env_config())
 
 
 def _build_stock_subagent() -> dict:
@@ -175,6 +169,8 @@ class DeepAgentHarness(AgentHarness):
         self._agent: Any = None
         self._model: Any = None
         self._user_agents: "OrderedDict[str, Any]" = OrderedDict()
+        # 与 _user_agents 同键：记录建 agent 时的模型配置指纹，变了即重建
+        self._user_agent_fingerprints: dict = {}
         self._saver_cm = None
         self._initialized = False
 
@@ -191,15 +187,32 @@ class DeepAgentHarness(AgentHarness):
         # 物化失败在 sync_user_skills 内降级为现状缓存目录,不阻塞对话(spec §5)
         sync_user_skills(db, user_id)
 
-        if user_id in self._user_agents:
+        # 模型配置指纹:换模型/换 Key/换默认项后立即重建,否则会一直沿用旧模型
+        fingerprint = config_fingerprint(db, user_id)
+        cached = self._user_agents.get(user_id)
+        if cached is not None and self._user_agent_fingerprints.get(user_id, fingerprint) == fingerprint:
             self._user_agents.move_to_end(user_id)
-            return self._user_agents[user_id]
-        model = self._model or _build_model()
+            return cached
+
+        model = self._resolve_user_model(db, user_id)
         agent = _build_agent(model, self._checkpointer, user_id=user_id)
         self._user_agents[user_id] = agent
+        self._user_agent_fingerprints[user_id] = fingerprint
+        self._user_agents.move_to_end(user_id)
         while len(self._user_agents) > AGENT_CACHE_SIZE:
-            self._user_agents.popitem(last=False)
+            evicted, _ = self._user_agents.popitem(last=False)
+            self._user_agent_fingerprints.pop(evicted, None)
         return agent
+
+    def _resolve_user_model(self, db: Session | None, user_id: str):
+        """该用户实际使用的模型：BYOK 配置优先，否则平台默认"""
+        if self._model_param is not None:
+            return self._model_param
+        if db is not None:
+            cfg = resolve_config(db, user_id)
+            if cfg.source == SOURCE_USER:
+                return build_chat_model(cfg)
+        return self._model or _build_model()
 
     async def initialize(self) -> None:
         """初始化重量级资源（测试注入模式跳过真实组件构造）"""
@@ -237,6 +250,7 @@ class DeepAgentHarness(AgentHarness):
                 self._checkpointer = None
                 self._agent = None
                 self._user_agents.clear()
+                self._user_agent_fingerprints.clear()
                 self._initialized = False
 
     async def clear_thread(self, thread_id: str) -> None:
