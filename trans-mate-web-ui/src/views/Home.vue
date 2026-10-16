@@ -143,7 +143,6 @@
           @click="toggleTts"
         >
           <i :class="ttsEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute'"></i>
-          <span>{{ ttsEnabled ? (isSpeaking ? t('home.ttsSpeaking') : t('home.ttsLabel')) : t('home.ttsMuted') }}</span>
         </button>
       </header>
 
