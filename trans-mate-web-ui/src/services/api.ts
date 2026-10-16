@@ -267,22 +267,25 @@ export const listConversationMessages = (
   return apiClient.get(`/api/conversations/${conversationId}/messages`)
 }
 
-// ==================== 语音转写（ASR）接口 ====================
+// ==================== 语音接口（OpenAI 兼容形态） ====================
+// 后端同时是 OpenAI 兼容网关：base_url=<服务地址>/v1 可直接用 OpenAI SDK 调用
 
-// 上传录音 blob，返回识别文本
-export const transcribeAudio = (audio: Blob): Promise<AxiosResponse<{ success: boolean; text: string }>> => {
-  return apiClient.post('/api/asr/transcribe', audio, {
-    headers: { 'Content-Type': 'audio/webm' },
-    timeout: 60000
-  })
+// 上传录音 blob，返回识别文本（POST /v1/audio/transcriptions, multipart）
+export const transcribeAudio = (audio: Blob): Promise<AxiosResponse<{ text: string }>> => {
+  const form = new FormData()
+  form.append('file', audio, 'recording.webm')
+  form.append('model', 'whisper-1')
+  // 不显式设置 Content-Type：由浏览器/axios 生成带 boundary 的 multipart 头
+  return apiClient.post('/v1/audio/transcriptions', form, { timeout: 60000 })
 }
 
-// 文本合成语音，返回 WAV 音频 blob
-export const synthesizeSpeech = (text: string): Promise<AxiosResponse<Blob>> => {
-  return apiClient.post('/api/tts/synthesize', { text }, {
-    responseType: 'blob',
-    timeout: 180000
-  })
+// 文本合成语音，返回音频 blob（POST /v1/audio/speech, JSON）
+export const synthesizeSpeech = (text: string, voice?: string): Promise<AxiosResponse<Blob>> => {
+  return apiClient.post(
+    '/v1/audio/speech',
+    { model: 'tts-1', input: text, voice, response_format: 'mp3' },
+    { responseType: 'blob', timeout: 180000 }
+  )
 }
 
 export default apiClient

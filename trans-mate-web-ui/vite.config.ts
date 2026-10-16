@@ -23,6 +23,11 @@ export default defineConfig({
         // target: 'http://192.168.0.226:8000',
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+      },
+      // OpenAI 兼容网关接口（/v1/audio/speech、/v1/audio/transcriptions）
+      '/v1': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
       }
     }
   },

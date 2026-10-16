@@ -316,12 +316,10 @@ class RAGAgent:
 ### 7.2 核心功能
 
 - **WebSocket 实时通信**：与后端 AI 智能体对话
-- **Azure Avatar 数字人**：
-  - 语音合成 (Text-to-Speech)
-  - 数字人视频流 (WebRTC)
-  - 字幕同步显示
-- **语音录制**：麦克风输入，WebSocket 传输
-- **视频通话**：WebRTC 实时视频流
+- **语音交互（OpenAI 兼容，均需登录）**：
+  - 语音转写 `POST /v1/audio/transcriptions`（multipart，返回 `{text}`）
+  - 语音合成 `POST /v1/audio/speech`（JSON，返回音频字节流）
+  - 服务地址加 `/v1` 后可直接用 OpenAI SDK 调用（`api_key` 传本服务登录 token）
 
 ### 7.3 状态管理
 
