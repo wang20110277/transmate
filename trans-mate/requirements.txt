@@ -61,6 +61,11 @@ cryptography==44.0.0
 #tushare
 tushare==1.4.9
 
+#akshare（股票数据：个股信息/搜索/指数日线/每日基本面——对应 tushare 接口在当前 token 权限下限 1 次/小时）
+akshare==1.19.1
+pandas==3.0.5
+tqdm==4.70.0
+
 #tavily
 tavily-python==0.7.23
 
